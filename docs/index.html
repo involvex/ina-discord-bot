@@ -5,164 +5,201 @@
   <title>Ina's Discord Bot - New World Companion</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="src/images/favicon.png">
+  <!-- Enhanced Styles -->
   <style>
-    body {
-      font-family: 'Segoe UI', 'Trebuchet MS', Verdana, sans-serif;
-      background: linear-gradient(135deg, #1b2838 0%, #3a5a40 100%);
-      color: #f3e9d2;
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      position: relative;
-      overflow-x: hidden;
-    }
-    .hero {
-      width: 100vw;
-      background: url('src/images/logo.png') no-repeat center 2em, linear-gradient(120deg, #1b2838 60%, #3a5a40 100%);
-      background-size: 120px, cover;
-      padding: 5em 2em 2em 2em;
-      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
-      border-bottom-left-radius: 32px;
-      border-bottom-right-radius: 32px;
-      margin-bottom: 2em;
-    }
-    .hero h1 {
-      font-size: 2.8em;
-      font-family: 'Cinzel', serif;
-      letter-spacing: 2px;
-      margin: 0.5em 0 0.2em 0;
-      color: #ffd700;
-      text-shadow: 0 2px 8px #000a;
-    }
-    .hero p {
-      font-size: 1.3em;
-      color: #e0e0e0;
-      margin-bottom: 1.5em;
-      text-shadow: 0 1px 4px #0007;
-    }
-    .highlight {
-      color: #ffd700;
-      font-weight: bold;
-    }
-    .btn {
-      background: linear-gradient(90deg, #5865F2 60%, #3a5a40 100%);
-      color: #fff;
-      padding: 1em 2.5em;
-      border-radius: 12px;
-      text-decoration: none;
-      font-size: 1.3em;
-      font-weight: bold;
-      box-shadow: 0 4px 16px 0 #0005;
-      transition: background 0.2s, transform 0.2s;
-      border: none;
-      outline: none;
-      display: inline-block;
-      margin-bottom: 1.5em;
-      vertical-align: middle;
-    }
-    .btn:hover {
-      background: linear-gradient(90deg, #ffd700 60%, #5865F2 100%);
-      color: #222;
-      transform: translateY(-2px) scale(1.04);
-      box-shadow: 0 8px 24px 0 #0007;
-    }
-    .links {
-      margin-top: 2.5em;
-      font-size: 1.1em;
-      display: flex;
-      gap: 1.5em;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .links a {
-      color: #ffd700;
-      text-decoration: none;
-      font-weight: 600;
-      transition: color 0.2s;
-    }
-    .links a:hover {
-      color: #fff;
-      text-shadow: 0 2px 8px #5865F2;
+body {
+    background: linear-gradient(135deg, #181c1f 0%, #232a34 100%);
+    min-height: 100vh;
+    color: #f5e6c8;
+    font-family: 'Cinzel', 'Merriweather', serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+}
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Merriweather:wght@400;700&display=swap');
+
+.hero {
+    text-align: center;
+    padding: 3rem 1rem 2rem 1rem;
+    background: radial-gradient(circle at 50% 0%, #2d2d2d 0%, #181c1f 100%);
+    box-shadow: 0 0 60px 10px #bfa04644;
+    position: relative;
+}
+.logo-glow {
+    width: 120px;
+    filter: drop-shadow(0 0 30px #bfa046cc) drop-shadow(0 0 10px #fff8e1cc);
+    margin-bottom: 1rem;
+    animation: glow 2.5s infinite alternate;
+}
+@keyframes glow {
+    0% { filter: drop-shadow(0 0 20px #bfa04688) drop-shadow(0 0 5px #fff8e1aa); }
+    100% { filter: drop-shadow(0 0 40px #bfa046ff) drop-shadow(0 0 20px #fff8e1ff); }
+}
+.title {
+    font-family: 'Cinzel', serif;
+    font-size: 3rem;
+    color: #ffe082;
+    letter-spacing: 2px;
+    margin: 0.5rem 0 0.2rem 0;
+    text-shadow: 0 0 10px #bfa046, 0 0 2px #fff8e1;
+}
+.subtitle {
+    font-size: 1.3rem;
+    color: #bfa046;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 8px #bfa04688;
+}
+.cta-btn {
+    display: inline-block;
+    background: linear-gradient(90deg, #bfa046 0%, #ffe082 100%);
+    color: #232a34;
+    font-weight: bold;
+    font-size: 1.1rem;
+    padding: 0.8rem 2.2rem;
+    border-radius: 30px;
+    box-shadow: 0 0 20px #bfa04688;
+    text-decoration: none;
+    margin-top: 1rem;
+    transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+    border: 2px solid #bfa046;
+}
+.cta-btn:hover {
+    background: #232a34;
+    color: #ffe082;
+    box-shadow: 0 0 30px #bfa046cc;
+    border: 2px solid #ffe082;
+}
+.features {
+    max-width: 900px;
+    margin: 3rem auto 2rem auto;
+    padding: 2rem 1rem;
+    background: rgba(34, 28, 18, 0.7);
+    border-radius: 18px;
+    box-shadow: 0 0 40px #bfa04633;
+}
+.features h2 {
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    color: #ffe082;
+    margin-bottom: 2rem;
+    font-size: 2.2rem;
+    text-shadow: 0 0 8px #bfa04688;
+}
+.feature-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    justify-content: center;
+}
+.feature-card {
+    background: linear-gradient(120deg, #232a34 60%, #181c1f 100%);
+    border: 1.5px solid #bfa04688;
+    border-radius: 14px;
+    box-shadow: 0 0 18px #bfa04622;
+    padding: 1.5rem 1.2rem;
+    width: 220px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+}
+.feature-card:hover {
+    transform: translateY(-8px) scale(1.04);
+    box-shadow: 0 0 32px #bfa046cc;
+    border-color: #ffe082;
+}
+.feature-icon {
+    font-size: 2.2rem;
+    margin-bottom: 0.7rem;
+    display: block;
+    text-shadow: 0 0 10px #bfa04688;
+}
+.feature-card h3 {
+    color: #ffe082;
+    font-family: 'Cinzel', serif;
+    margin: 0.5rem 0 0.3rem 0;
+    font-size: 1.2rem;
+}
+.feature-card p {
+    color: #f5e6c8;
+    font-size: 1rem;
+    margin: 0;
+}
+.footer {
+    text-align: center;
+    padding: 1.5rem 0 1rem 0;
+    color: #bfa046;
+    background: linear-gradient(90deg, #181c1f 60%, #232a34 100%);
+    font-size: 1rem;
+    border-top: 1.5px solid #bfa04633;
+    margin-top: 3rem;
+}
+.footer a {
+    color: #ffe082;
+    text-decoration: underline;
+    transition: color 0.2s;
+}
+.footer a:hover {
+    color: #bfa046;
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+    .feature-list {
+        flex-direction: column;
+        gap: 1.2rem;
     }
     .features {
-      max-width: 700px;
-      margin: 2em auto 0 auto;
-      background: rgba(34, 40, 49, 0.7);
-      border-radius: 18px;
-      box-shadow: 0 2px 16px 0 #0005;
-      padding: 2em 2em 1em 2em;
-      color: #f3e9d2;
+        padding: 1.2rem 0.2rem;
     }
-    .features h2 {
-      color: #ffd700;
-      font-family: 'Cinzel', serif;
-      margin-top: 0;
+    .feature-card {
+        width: 95%;
+        margin: 0 auto;
     }
-    .features ul {
-      text-align: left;
-      font-size: 1.1em;
-      margin: 1em 0 0 0;
-      padding-left: 1.2em;
+    .title {
+        font-size: 2.1rem;
     }
-    .features li {
-      margin-bottom: 0.7em;
-      line-height: 1.5;
-    }
-    .footer {
-      margin-top: 3em;
-      color: #aaa;
-      font-size: 0.95em;
-    }
-    @media (max-width: 600px) {
-      .hero {
-        padding: 3em 1em 1em 1em;
-        background-size: 80px, cover;
-      }
-      .hero h1 {
-        font-size: 2em;
-      }
-      .btn {
-        font-size: 1em;
-        padding: 0.8em 1.5em;
-      }
-      .features {
-        padding: 1em 0.5em 0.5em 0.5em;
-      }
-    }
+}
   </style>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="hero">
-    <h1>Ina's Discord Bot</h1>
-    <p>A <span class="highlight">New World MMO</span> companion for your Discord server.<br>
-    Bring Aeternum's magic, fun, and adventure to your community!</p>
-    <a class="btn" href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8" target="_blank" rel="noopener">
-      🤖 Invite Ina's Bot
-    </a>
-    <div class="links">
-      <a href="https://github.com/involvex/ina-discord-bot-" target="_blank" rel="noopener">View on GitHub</a>
-      <a href="https://involvex.github.io/ina-discord-bot-/" target="_blank" rel="noopener">Project GitHub Page</a>
-      <a href="https://www.newworld.com/" target="_blank" rel="noopener">About New World</a>
+  <!-- Hero Section -->
+<header class="hero">
+    <img src="src/images/logo.png" alt="Ina Discord Bot Logo" class="logo-glow" />
+    <h1 class="title">Ina Discord Bot</h1>
+    <p class="subtitle">Your New World MMO Companion for Discord</p>
+    <a href="https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot" class="cta-btn">Summon Ina to Your Server</a>
+</header>
+
+<!-- Features Section -->
+<section class="features">
+    <h2>Bot Features</h2>
+    <div class="feature-list">
+        <div class="feature-card">
+            <span class="feature-icon">🗺️</span>
+            <h3>New World Themed Commands</h3>
+            <p>Interact with commands inspired by the lands of Aeternum, including <b>/petpet</b> and <b>/help</b> with immersive flavor text.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">⚔️</span>
+            <h3>Adventure Ready</h3>
+            <p>Perfect for guilds, expeditions, and roleplay. Bring the spirit of New World to your Discord community.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">✨</span>
+            <h3>Modern & Beautiful</h3>
+            <p>Dark fantasy design, glowing gold highlights, and a magical user experience.</p>
+        </div>
+        <div class="feature-card">
+            <span class="feature-icon">📜</span>
+            <h3>Comprehensive Documentation</h3>
+            <p>Easy-to-follow guides and reference, themed for the New World adventurer.</p>
+        </div>
     </div>
-  </div>
-  <div class="features">
-    <h2>✨ Features</h2>
-    <ul>
-      <li><b>New World Database Lookup:</b> Instantly fetch item stats, recipes, and lore from Aeternum.</li>
-      <li><b>Fun Status Rotation:</b> The bot cycles through witty New World-themed statuses.</li>
-      <li><b>AI-powered Chat:</b> Ask questions, get tips, or lore with Gemini AI integration.</li>
-      <li><b>Petpet Rituals:</b> Perform the legendary <span class="highlight">/petpet</span> on your friends—summon magical GIFs!</li>
-      <li><b>Random GIFs:</b> Bring laughter to your company with trending GIFs.</li>
-      <li><b>Expedition Tools:</b> Handy calculators and utilities for your New World journey.</li>
-      <li><b>Fully Customizable:</b> Open source, easy to extend, and ready for your guild.</li>
-    </ul>
-  </div>
+</section>
+
   <footer class="footer">
-    <span>Made with ❤️ for the New World community &copy; 2025</span>
+    <p>© 2025 Ina Discord Bot &middot; Inspired by New World MMO &middot; <a href="https://github.com/involvex/ina-discord-bot-">GitHub</a></p>
   </footer>
 </body>
 </html>
