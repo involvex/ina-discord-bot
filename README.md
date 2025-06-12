@@ -16,6 +16,27 @@
 
 </div>
 
+# Ina's Discord Bot
+
+Ina's Bot is a playful, New World MMO-themed Discord bot with fun commands, AI integration, and more!
+
+## Features
+
+- New World Database lookups
+- Fun status rotation
+- AI-powered chat (Gemini)
+- GIFs, petpet, and more!
+
+## Invite Ina's Bot to Your Server
+
+[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=8)
+
+> Replace `YOUR_CLIENT_ID` with your bot’s actual client ID.
+
+## Documentation
+
+See the [GitHub Pages site](https://involvex.github.io/ina-discord-bot-/) for full documentation and usage instructions.
+
 ## A Feature-rich Discord Bot Framework for Python
 
 A highly extensible, easy to use, and feature complete framework for Discord.
@@ -90,3 +111,4 @@ bot.start("token")
 ```
 
 With `interactions.py`, you can quickly and easily build complex Discord applications with Python. Check out our [guides](https://interactions-py.github.io/interactions.py/Guides/01%20Getting%20Started) for more information. Or join our [discord](https://discord.gg/interactions).
+# ina-discord-bot-
