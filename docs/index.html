@@ -4,22 +4,126 @@
   <meta charset="UTF-8">
   <title>Ina's Discord Bot</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/png" href="src/images/favicon.png">
   <style>
-    body { font-family: sans-serif; background: #f8fafc; color: #222; text-align: center; padding: 2em; }
-    .btn { background: #5865F2; color: #fff; padding: 1em 2em; border-radius: 8px; text-decoration: none; font-size: 1.2em; }
-    .btn:hover { background: #4752c4; }
-    .logo { width: 120px; margin-bottom: 1em; }
+    body {
+      font-family: 'Segoe UI', 'Trebuchet MS', Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f2027 0%, #2c5364 100%);
+      color: #f3e9d2;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      position: relative;
+      overflow-x: hidden;
+    }
+    .hero {
+      width: 100vw;
+      background: url('src/images/logo.png') no-repeat center 2em, linear-gradient(120deg, #1b2838 60%, #3a5a40 100%);
+      background-size: 120px, cover;
+      padding: 5em 2em 2em 2em;
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
+      border-bottom-left-radius: 32px;
+      border-bottom-right-radius: 32px;
+      margin-bottom: 2em;
+    }
+    .hero h1 {
+      font-size: 2.8em;
+      font-family: 'Cinzel', serif;
+      letter-spacing: 2px;
+      margin: 0.5em 0 0.2em 0;
+      color: #ffd700;
+      text-shadow: 0 2px 8px #000a;
+    }
+    .hero p {
+      font-size: 1.3em;
+      color: #e0e0e0;
+      margin-bottom: 1.5em;
+      text-shadow: 0 1px 4px #0007;
+    }
+    .highlight {
+      color: #ffd700;
+      font-weight: bold;
+    }
+    .btn {
+      background: linear-gradient(90deg, #5865F2 60%, #3a5a40 100%);
+      color: #fff;
+      padding: 1em 2.5em;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 1.3em;
+      font-weight: bold;
+      box-shadow: 0 4px 16px 0 #0005;
+      transition: background 0.2s, transform 0.2s;
+      border: none;
+      outline: none;
+      display: inline-block;
+      margin-bottom: 1.5em;
+      vertical-align: middle;
+    }
+    .btn:hover {
+      background: linear-gradient(90deg, #ffd700 60%, #5865F2 100%);
+      color: #222;
+      transform: translateY(-2px) scale(1.04);
+      box-shadow: 0 8px 24px 0 #0007;
+    }
+    .links {
+      margin-top: 2.5em;
+      font-size: 1.1em;
+      display: flex;
+      gap: 1.5em;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .links a {
+      color: #ffd700;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+    .links a:hover {
+      color: #fff;
+      text-shadow: 0 2px 8px #5865F2;
+    }
+    .footer {
+      margin-top: 3em;
+      color: #aaa;
+      font-size: 0.95em;
+    }
+    @media (max-width: 600px) {
+      .hero {
+        padding: 3em 1em 1em 1em;
+        background-size: 80px, cover;
+      }
+      .hero h1 {
+        font-size: 2em;
+      }
+      .btn {
+        font-size: 1em;
+        padding: 0.8em 1.5em;
+      }
+    }
   </style>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
 </head>
 <body>
-  <h1>Ina's Discord Bot</h1>
-  <p>A playful, New World MMO-themed Discord bot for your server!</p>
-  <a class="btn" href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8" target="_blank">
-    Invite Ina's Bot
-  </a>
-  <p style="margin-top:2em;">
-    <a href="https://github.com/involvex/ina-discord-bot-">View on GitHub</a> |
-    <a href="https://involvex.github.io/ina-discord-bot-/">Project GitHub Page</a>
-  </p>
+  <div class="hero">
+    <h1>Ina's Discord Bot</h1>
+    <p>A playful, <span class="highlight">New World MMO</span>-themed Discord bot for your server!<br>
+    Bring Aeternum's magic, fun, and adventure to your community.</p>
+    <a class="btn" href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8" target="_blank" rel="noopener">
+      🤖 Invite Ina's Bot
+    </a>
+    <div class="links">
+      <a href="https://github.com/involvex/ina-discord-bot-" target="_blank" rel="noopener">View on GitHub</a>
+      <a href="https://involvex.github.io/ina-discord-bot-/" target="_blank" rel="noopener">Project GitHub Page</a>
+      <a href="https://www.newworld.com/" target="_blank" rel="noopener">About New World</a>
+    </div>
+  </div>
+  <footer class="footer">
+    <span>Made with ❤️ for the New World community &copy; 2025</span>
+  </footer>
 </body>
 </html>

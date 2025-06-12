@@ -195,10 +195,12 @@ async def ping(ctx):
         )
     ]
 
-    embed = interactions.Embed(title="Pong!", description="Pong!", color=BrandColours.BLURPLE)
+    embed = interactions.Embed()
+    embed.title = "Pong!"
+    embed.description = "Pong!"
+    embed.color = BrandColours.BLURPLE
     for i in range(5):
         embed.add_field(name=f"Field {i}", value=f"Value {uuid.uuid4()}")
-
     if DEBUG:
         embed.add_field(name="Debug Info", value=f"Python: {sys.version}\nJurigged: Active\nTime: {uuid.uuid4()}")
 
@@ -306,11 +308,10 @@ async def help_command(ctx: interactions.SlashContext, command: Optional[str] = 
 
         if command in command_details:
             details = command_details[command]
-            embed = interactions.Embed(
-                title=details["title"],
-                description=details["description"],
-                color=BrandColours.BLURPLE
-            )
+            embed = interactions.Embed()
+            embed.title = details["title"]
+            embed.description = details["description"]
+            embed.color = BrandColours.BLURPLE
             embed.add_field(name="Usage", value=f"```{details['usage']}```", inline=False)
             if details["parameters"]:
                 param_str = "\n".join([f"**{p['name']}**: {p['description']}" for p in details["parameters"]])
@@ -326,39 +327,31 @@ async def help_command(ctx: interactions.SlashContext, command: Optional[str] = 
             await ctx.send(f"No detailed help available for command: `{command}`\nUse `/help` to see all available commands.", ephemeral=True)
             return
 
-    help_embed = interactions.Embed(
-        title="📚 Bot Commands",
-        description="Here are all the available commands you can use:",
-        color=BrandColours.BLURPLE
-    )
+    help_embed = interactions.Embed()
+    help_embed.title = "📚 Ina's New World Bot Commands"
+    help_embed.description = "Welcome to Aeternum! Here are all the commands you can use to enhance your Discord adventures:"
+    help_embed.color = BrandColours.BLURPLE
     help_embed.add_field(
         name="🎮 Game Commands",
-        value="**/nwdb** `item_name` - Look up an item from New World Database\n"
-              "→ Shows item details and crafting recipes",
+        value="**/nwdb** `item_name` - Look up an item from New World Database\n→ Shows item details and crafting recipes",
         inline=False
     )
     help_embed.add_field(
         name="🔧 Utility Commands",
-        value="**/calculator** `expression` - Perform mathematical calculations\n"
-              "**/ask** `prompt` - Ask Gemini AI a question\n"
-              "**/ping** - Check if the bot is online\n"
-              "**/help** - Show this help message",
+        value="**/calculator** `expression` - Perform mathematical calculations\n**/ask** `prompt` - Ask Gemini AI a question\n**/ping** - Check if the bot is online\n**/help** - Show this help message",
         inline=False
     )
     help_embed.add_field(
         name="🎉 Fun Commands",
-        value="**/petpet** `@user` - Generate a petpet GIF for a user\n"
-              "**/randomgif** - Get a random GIF from Tenor",
+        value="**/petpet** `@user` - Perform a New World petting ritual on a user (summons a magical petpet GIF)\n**/randomgif** - Get a random GIF from Tenor",
         inline=False
     )
     help_embed.add_field(
         name="⚙️ Advanced Commands",
-        value="**/debug** `mode` - Toggle debug mode or check status\n"
-              "**/record** `duration` - Record audio in your voice channel\n"
-              "**/components** - Show UI component examples",
+        value="**/debug** `mode` - Toggle debug mode or check status\n**/record** `duration` - Record audio in your voice channel\n**/components** - Show UI component examples",
         inline=False
     )
-    help_embed.set_footer(text="Use /help <command> for more details on a specific command")
+    help_embed.set_footer(text="Use /help <command> for more details on a specific command. May the winds of Aeternum guide you!")
     await ctx.send(embeds=help_embed)
 
 
@@ -571,11 +564,10 @@ async def on_modal(event):
             item_type = item.get(get_key(['Item Type', 'resource_type', 'Type']), '')
             perks = item.get(get_key(['Perks', 'perks']), '')
 
-            embed = interactions.Embed(
-                title=title,
-                description=description,
-                color=BrandColours.GREEN if item_type else BrandColours.BLURPLE
-            )
+            embed = interactions.Embed()
+            embed.title = title
+            embed.description = description
+            embed.color = BrandColours.GREEN if item_type else BrandColours.BLURPLE
 
             # Main Info Section
             info_lines = []
@@ -715,11 +707,10 @@ async def nwdb(ctx: interactions.SlashContext, item_name: str):
             item_type = item.get(get_key(['Item Type', 'resource_type', 'Type']), '')
             perks = item.get(get_key(['Perks', 'perks']), '')
 
-            embed = interactions.Embed(
-                title=title,
-                description=description,
-                color=BrandColours.GREEN if item_type else BrandColours.BLURPLE
-            )
+            embed = interactions.Embed()
+            embed.title = title
+            embed.description = description
+            embed.color = BrandColours.GREEN if item_type else BrandColours.BLURPLE
 
             # Main Info Section
             info_lines = []
@@ -934,44 +925,50 @@ async def ask_command(ctx: interactions.SlashContext, prompt: str):
         logging.exception(f"Error in /ask command: {e}")
         await ctx.send(f"An error occurred while processing your request: {e}", ephemeral=True)
 
-@slash_command("petpet", description="Generate a petpet GIF for a user")
+
+@slash_command("petpet", description="Give a New World petting ritual to a user!")
 @slash_option(
     "user",
-    "The user to pet",
+    "The user to pet (Aeternum style)",
     opt_type=interactions.OptionType.USER,
     required=True,
 )
 async def petpet(ctx: interactions.SlashContext, user: interactions.User):
+    import tempfile
     try:
         avatar_url = user.avatar_url
         if avatar_url and not avatar_url.endswith(".png"):
             avatar_url = avatar_url.split("?")[0] + ".png"
         api_url = f"https://some-random-api.ml/canvas/petpet?avatar={avatar_url}"
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(api_url, timeout=10) as resp:
+            timeout = aiohttp.ClientTimeout(total=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(api_url) as resp:
                     if resp.status == 200:
                         gif_bytes = await resp.read()
-                        file = File(gif_bytes, file_name="petpet.gif")
-                        await ctx.send(f"Here's a petpet for {user.mention}!", files=[file])
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
+                            tmpfile.write(gif_bytes)
+                            tmpfile_path = tmpfile.name
+                        file = File(tmpfile_path, file_name="petpet.gif")
+                        await ctx.send(f"{user.mention} receives a legendary Aeternum petpet! 🐾\nMay your luck in expeditions increase!", files=[file])
                     else:
-                        # If the API is up but returns an error, show the error
                         try:
                             error_json = await resp.json()
                             error_msg = error_json.get("error") or error_json.get("message") or "API error"
                         except Exception:
                             error_msg = "API error"
-                        await ctx.send(f"Failed to generate petpet GIF: {error_msg}", ephemeral=True)
+                        await ctx.send(f"Failed to conjure a petpet GIF: {error_msg}\nThe spirits of Aeternum are restless.", ephemeral=True)
         except (aiohttp.ClientConnectorError, aiohttp.ClientOSError):
-            await ctx.send("The petpet API is currently unreachable. Please try again later. (DNS or network error)", ephemeral=True)
+            await ctx.send("The petpet ritual failed. The winds of Aeternum disrupt the connection. Try again soon!", ephemeral=True)
         except asyncio.TimeoutError:
-            await ctx.send("The petpet API took too long to respond. Please try again later.", ephemeral=True)
+            await ctx.send("The petpet spirits are slow to answer. Please try again later.", ephemeral=True)
         except Exception as e:
             logging.error(f"Error connecting to petpet API: {e}")
-            await ctx.send("A network error occurred while generating the petpet GIF. Please try again later.", ephemeral=True)
+            await ctx.send("A mysterious error occurred during the petpet ritual. Try again later!", ephemeral=True)
     except Exception as e:
         logging.error(f"Error in /petpet command: {e}")
-        await ctx.send(f"An error occurred while generating the petpet GIF: {e}", ephemeral=True)
+        await ctx.send(f"An ancient error has occurred while summoning the petpet GIF: {e}", ephemeral=True)
+
 
 @slash_command("randomgif", description="Send a random GIF from Tenor")
 async def randomgif(ctx: interactions.SlashContext):
@@ -1000,6 +997,7 @@ async def randomgif(ctx: interactions.SlashContext):
         logging.error(f"Error in /randomgif command: {e}")
         await ctx.send("An error occurred while fetching a GIF.", ephemeral=True)
 
+
 try:
     bot.start(bot_token)
 except Exception as e:
@@ -1024,94 +1022,46 @@ async def on_message_create(event):
     message = getattr(event, "message", None) or getattr(event, "data", None)
     if not message:
         return
-
-    # Defensive: author may be a dict or object
     author = getattr(message, "author", None)
     if not author:
-        author = getattr(message, "user", None)
-    if not author:
-        # Try dict fallback
-        author = message.get("author") if isinstance(message, dict) else None
-    if not author:
         return
-    # Check if author is a bot
     is_bot = getattr(author, "bot", None)
     if is_bot is None and isinstance(author, dict):
         is_bot = author.get("bot", False)
     if is_bot:
         return
-
-    # Try both .me and .user for the bot's user object
     bot_self = getattr(bot, "me", None) or getattr(bot, "user", None)
     if not bot_self or not hasattr(bot_self, "id"):
         return
     bot_id = str(getattr(bot_self, "id", None))
-
-    # Mentions may be a list of objects or dicts
     mentions = getattr(message, "mentions", []) or []
     if not mentions and isinstance(message, dict):
         mentions = message.get("mentions", [])
     mentioned_ids = set()
     for m in mentions:
-        mid = getattr(m, "id", None)
-        if mid is None and isinstance(m, dict):
+        if isinstance(m, dict):
             mid = m.get("id")
+        else:
+            mid = getattr(m, "id", None)
         if mid:
             mentioned_ids.add(str(mid))
-
-    # Also check if the bot was mentioned by raw mention string in content
     content = getattr(message, "content", "") or getattr(message, "text", "")
-    # Add debug logging to see if the mention is detected
     logging.debug(f"Message content: {content}")
     logging.debug(f"Mentions: {mentioned_ids}, Bot ID: {bot_id}")
     if not mentioned_ids and bot_id and f"<@{bot_id}>" in content:
         mentioned_ids.add(bot_id)
-
-    # Add debug log to confirm mention detection
     if bot_id in mentioned_ids:
-        logging.info(f"Bot was mentioned in message: {content}")
-        prompt = (
-            "You are a funny New World MMO Discord bot. "
-            "Someone just pinged you in chat. Respond with a witty, playful, and New World-themed message, "
-            "as if you are a quirky NPC or player in Aeternum. Keep it short and fun."
-        )
-        user_message = content
-        full_prompt = f"{prompt}\nUser said: {user_message}\nBot reply:"
-
-        if genai is None or not GEMINI_API_KEY:
-            reply = "Ich bin zu beschäftigt mit Truthahn-Jagd, um zu antworten! (Gemini AI nicht verfügbar)"
-        else:
+        reply = "Hello, I am Ina's New World Bot! Type /help for commands."
+        channel = None
+        if hasattr(message, "channel"):
+            channel = getattr(message, "channel", None)
+        elif isinstance(message, dict) and "channel_id" in message:
+            channel_id = message["channel_id"]
+            channel = await bot.fetch_channel(channel_id)
+        # Only call send if channel is not GuildForum or GuildCategory and has send
+        channel_class = type(channel).__name__ if channel else None
+        if channel and hasattr(channel, "send") and callable(getattr(channel, "send", None)) and channel_class not in ("GuildForum", "GuildCategory"):
             try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-                loop = asyncio.get_running_loop()
-                response = await loop.run_in_executor(None, model.generate_content, full_prompt)
-                reply = response.text.strip() if hasattr(response, "text") else str(response)
-                if len(reply) > 1900:
-                    reply = reply[:1900] + "... (truncated)"
-            except Exception as e:
-                logging.exception(f"Error in mention Gemini AI reply: {e}")
-                reply = "Mein Azoth ist leer, ich kann gerade nicht antworten! (AI-Fehler)"
-
-        try:
-            # Try reply, then send, then fallback to logging
-            if hasattr(message, "reply") and callable(getattr(message, "reply", None)):
-                await message.reply(reply, mention_author=False)
-            elif hasattr(message, "channel") and callable(getattr(message.channel, "send", None)):
-                await message.channel.send(reply)
-            elif isinstance(message, dict) and "channel_id" in message:
-                channel_id = message["channel_id"]
-                try:
-                    channel = await bot.fetch_channel(str(channel_id))
-                    if hasattr(channel, "send") and callable(getattr(channel, "send", None)):
-                        await channel.send(reply)
-                    elif hasattr(channel, "send_message") and callable(getattr(channel, "send_message", None)):
-                        await channel.send_message(reply)
-                    else:
-                        logging.warning("Fetched channel has no send/send_message method.")
-                except Exception as e:
-                    logging.error(f"Failed to send reply via fetched channel: {e}")
-            else:
-                logging.warning(f"No valid way to send reply to mention. Would have replied: {reply}")
-        except Exception as e:
-            logging.error(f"Failed to reply to mention: {e}")
+                await channel.send(reply)
+            except Exception:
+                pass  # Ignore channels that do not support send()
