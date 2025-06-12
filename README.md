@@ -1,103 +1,46 @@
-<<<<<<< HEAD
-<div align="center">
-
-   # Interactions.py
-   <br>
-
-   ![](https://img.shields.io/pypi/v/discord-py-interactions.svg?label=Version&logo=pypi)
-   ![](https://img.shields.io/badge/Python-3.10+-1081c1?logo=python)
-   [![](https://img.shields.io/pypi/dm/discord-py-slash-command.svg?logo=python&label=Downloads)](https://pypi.org/project/discord-py-interactions/)
-
-   [![](https://img.shields.io/badge/Code%20Style-black-000000.svg)](https://github.com/psf/black)
-   [![License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/interactions-py/interactions.py/blob/stable/LICENSE)
-
-   [![](https://img.shields.io/badge/Docs-latest-x?logo=readthedocs)](https://interactions-py.github.io/interactions.py/)
-   [![](https://img.shields.io/badge/Guides-latest-x?logo=readthedocs)](https://interactions-py.github.io/interactions.py/Guides/01%20Getting%20Started)
-   [![image](https://discord.com/api/guilds/789032594456576001/embed.png)](https://discord.gg/interactions)
-
-</div>
-
 # Ina's Discord Bot
 
-Ina's Bot is a playful, New World MMO-themed Discord bot with fun commands, AI integration, and more!
+![Ina's Bot Logo](docs/src/images/logo.png)
 
-## Features
+A playful, **New World MMO-themed** Discord bot for your server!
 
-- New World Database lookups
-- Fun status rotation
-- AI-powered chat (Gemini)
-- GIFs, petpet, and more!
+[![Invite Ina's Bot](https://img.shields.io/badge/Invite%20Ina's%20Bot-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=5865F2)](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-View%20Repo-181717?style=for-the-badge&logo=github)](https://github.com/involvex/ina-discord-bot-)
+[![Docs](https://img.shields.io/badge/Docs-Project%20Page-3a5a40?style=for-the-badge&logo=readthedocs)](https://involvex.github.io/ina-discord-bot-/)
+[![About New World](https://img.shields.io/badge/About%20New%20World-ffd700?style=for-the-badge&logo=amazon&logoColor=black)](https://www.newworld.com/)
 
-## Invite Ina's Bot to Your Server
+---
 
-[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
+## ✨ Features
 
+- **New World Database Lookup:** Instantly fetch item stats, recipes, and lore from Aeternum.
+- **Fun Status Rotation:** The bot cycles through witty New World-themed statuses.
+- **AI-powered Chat:** Ask questions, get tips, or lore with Gemini AI integration.
+- **Petpet Rituals:** Perform the legendary `/petpet` on your friends—summon magical GIFs!
+- **Random GIFs:** Bring laughter to your company with trending GIFs.
+- **Expedition Tools:** Handy calculators and utilities for your New World journey.
+- **Fully Customizable:** Open source, easy to extend, and ready for your guild.
 
-## Documentation
+---
+
+## 🚀 Invite Ina's Bot to Your Server
+
+[**Click here to invite Ina's Bot**](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
+
+---
+
+## 📚 Documentation
 
 See the [GitHub Pages site](https://involvex.github.io/ina-discord-bot-/) for full documentation and usage instructions.
 
-## A Feature-rich Discord Bot Framework for Python
+---
 
-A highly extensible, easy to use, and feature complete framework for Discord.
+## 🛠️ Quickstart
 
-`interactions.py` is the culmination of years of experience with Discord's APIs and bot development. This framework has been built from the ground up with community feedback and suggestions in mind. Our framework provides a modern and intuitive set of language bindings for easy interaction with Discord.
+```bash
+pip install -U discord-py-interactions
+```
 
-## Key Features
-interactions.py offers a wide range of features for building Python-powered Discord bots and web applications alike:
-- ✅ 100% coverage of the Discord API
-- ✅ Dynamic cache with TTL support
-- ✅ Modern and Pythonic API for easy interaction with Discord
-- ✅ Proper rate-limit handling
-- ✅ Feature parity with most other Discord API wrappers
-- ✅ Fully automated command synchronisation
-
-In addition to core functionality, `interactions.py` provides a range of optional extensions, allowing you to further customize your bot and add new features with ease.
-
-## Extensibility
-
-So the base library doesn't do what you want? No problem! With builtin extensions, you are able to extend the functionality of the library. And if none of those pique your interest, there are a myriad of other extension libraries available.
-
-Just type `bot.load_extension("extension")`
-
-<details>
-    <summary>Extensions</summary>
-
-   ### Prefixed Commands
-
-   Prefixed commands, message commands, or legacy commands.
-   Whatever you want to call them, by default the `interactions.py` library will not handle these. But rest assured this extension will get you going
-
-  - ✅ Automatic command registration
-  - ✅ Annotation support
-
-  ### Debug Extension
-
-  A fully featured debug and utilities suite to help you get your bots made
-
-  ### Jurigged
-
-  A hot reloading extension allowing you to automagically update your bot without reboots
-
-  ### Sentry
-
-  Integrates Sentry.io error tracking into your bot with a single line
-
-  ### Console
-
-  Adds `aiomonitor` support with enables cli commands over a web interface
-
-  ### Paginators
-
-  Easily create multi-page embeds without having to implement the UX
-
-</details>
-
-## Where do I start?
-
-Getting started with `interactions.py` is easy! Simply install it via `pip` and start building your Discord application in Python:
-
-`pip install -U discord-py-interactions`
 ```python
 import interactions
 
@@ -110,121 +53,6 @@ async def on_startup():
 bot.start("token")
 ```
 
-With `interactions.py`, you can quickly and easily build complex Discord applications with Python. Check out our [guides](https://interactions-py.github.io/interactions.py/Guides/01%20Getting%20Started) for more information. Or join our [discord](https://discord.gg/interactions).
-# ina-discord-bot-
-=======
-<div align="center">
+---
 
-   # Interactions.py
-   <br>
-
-   ![](https://img.shields.io/pypi/v/discord-py-interactions.svg?label=Version&logo=pypi)
-   ![](https://img.shields.io/badge/Python-3.10+-1081c1?logo=python)
-   [![](https://img.shields.io/pypi/dm/discord-py-slash-command.svg?logo=python&label=Downloads)](https://pypi.org/project/discord-py-interactions/)
-
-   [![](https://img.shields.io/badge/Code%20Style-black-000000.svg)](https://github.com/psf/black)
-   [![License](https://img.shields.io/badge/License-MIT-blue)](https://github.com/interactions-py/interactions.py/blob/stable/LICENSE)
-
-   [![](https://img.shields.io/badge/Docs-latest-x?logo=readthedocs)](https://interactions-py.github.io/interactions.py/)
-   [![](https://img.shields.io/badge/Guides-latest-x?logo=readthedocs)](https://interactions-py.github.io/interactions.py/Guides/01%20Getting%20Started)
-   [![image](https://discord.com/api/guilds/789032594456576001/embed.png)](https://discord.gg/interactions)
-
-</div>
-
-# Ina's Discord Bot
-
-Ina's Bot is a playful, New World MMO-themed Discord bot with fun commands, AI integration, and more!
-
-## Features
-
-- New World Database lookups
-- Fun status rotation
-- AI-powered chat (Gemini)
-- GIFs, petpet, and more!
-
-## Invite Ina's Bot to Your Server
-
-[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
-
-> Replace `1368579444209352754` with your bot’s actual client ID.
-
-## Documentation
-
-See the [GitHub Pages site](https://involvex.github.io/ina-discord-bot-/) for full documentation and usage instructions.
-
-## A Feature-rich Discord Bot Framework for Python
-
-A highly extensible, easy to use, and feature complete framework for Discord.
-
-`interactions.py` is the culmination of years of experience with Discord's APIs and bot development. This framework has been built from the ground up with community feedback and suggestions in mind. Our framework provides a modern and intuitive set of language bindings for easy interaction with Discord.
-
-## Key Features
-interactions.py offers a wide range of features for building Python-powered Discord bots and web applications alike:
-- ✅ 100% coverage of the Discord API
-- ✅ Dynamic cache with TTL support
-- ✅ Modern and Pythonic API for easy interaction with Discord
-- ✅ Proper rate-limit handling
-- ✅ Feature parity with most other Discord API wrappers
-- ✅ Fully automated command synchronisation
-
-In addition to core functionality, `interactions.py` provides a range of optional extensions, allowing you to further customize your bot and add new features with ease.
-
-## Extensibility
-
-So the base library doesn't do what you want? No problem! With builtin extensions, you are able to extend the functionality of the library. And if none of those pique your interest, there are a myriad of other extension libraries available.
-
-Just type `bot.load_extension("extension")`
-
-<details>
-    <summary>Extensions</summary>
-
-   ### Prefixed Commands
-
-   Prefixed commands, message commands, or legacy commands.
-   Whatever you want to call them, by default the `interactions.py` library will not handle these. But rest assured this extension will get you going
-
-  - ✅ Automatic command registration
-  - ✅ Annotation support
-
-  ### Debug Extension
-
-  A fully featured debug and utilities suite to help you get your bots made
-
-  ### Jurigged
-
-  A hot reloading extension allowing you to automagically update your bot without reboots
-
-  ### Sentry
-
-  Integrates Sentry.io error tracking into your bot with a single line
-
-  ### Console
-
-  Adds `aiomonitor` support with enables cli commands over a web interface
-
-  ### Paginators
-
-  Easily create multi-page embeds without having to implement the UX
-
-</details>
-
-## Where do I start?
-
-Getting started with `interactions.py` is easy! Simply install it via `pip` and start building your Discord application in Python:
-
-`pip install -U discord-py-interactions`
-```python
-import interactions
-
-bot = interactions.Client()
-
-@interactions.listen()
-async def on_startup():
-    print("Bot is ready!")
-
-bot.start("token")
-```
-
-With `interactions.py`, you can quickly and easily build complex Discord applications with Python. Check out our [guides](https://interactions-py.github.io/interactions.py/Guides/01%20Getting%20Started) for more information. Or join our [discord](https://discord.gg/interactions).
-# ina-discord-bot-
->>>>>>> e646c69471c8da90962fe0eb5ffd0837c813b2cf
+_Made with ❤️ for the New World community &copy; 2025_
