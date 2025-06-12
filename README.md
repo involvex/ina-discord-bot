@@ -30,9 +30,8 @@ Ina's Bot is a playful, New World MMO-themed Discord bot with fun commands, AI i
 
 ## Invite Ina's Bot to Your Server
 
-[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=8)
+[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
 
-> Replace `YOUR_CLIENT_ID` with your bot’s actual client ID.
 
 ## Documentation
 
@@ -145,9 +144,9 @@ Ina's Bot is a playful, New World MMO-themed Discord bot with fun commands, AI i
 
 ## Invite Ina's Bot to Your Server
 
-[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=bot+applications.commands&permissions=8)
+[Click here to invite Ina's Bot](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
 
-> Replace `YOUR_CLIENT_ID` with your bot’s actual client ID.
+> Replace `1368579444209352754` with your bot’s actual client ID.
 
 ## Documentation
 
