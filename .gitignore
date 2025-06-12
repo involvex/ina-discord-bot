@@ -19,3 +19,4 @@ __pycache__
 /TestResults.xml
 /.coverage
 .mypy_cache/
+items.json
