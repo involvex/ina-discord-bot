@@ -1,19 +1,19 @@
 import os
 import sys
-import asyncio
+import random
 import logging
+import asyncio
 import uuid
+import unicodedata
+import re
 import items
-import recipes
+import interactions
+import math
 from thefuzz import process
 from dotenv import load_dotenv
 from typing import Optional
-import unicodedata
-import re
-import random
 import aiohttp
 
-import interactions
 from interactions import (
     Client,
     listen,
@@ -926,6 +926,7 @@ async def ask_command(ctx: interactions.SlashContext, prompt: str):
         await ctx.send(f"An error occurred while processing your request: {e}", ephemeral=True)
 
 
+# --- /petpet command ---
 @slash_command("petpet", description="Give a New World petting ritual to a user!")
 @slash_option(
     "user",
@@ -934,74 +935,24 @@ async def ask_command(ctx: interactions.SlashContext, prompt: str):
     required=True,
 )
 async def petpet(ctx: interactions.SlashContext, user: interactions.User):
-    import tempfile
     try:
-        avatar_url = user.avatar_url
-        if avatar_url and not avatar_url.endswith(".png"):
-            avatar_url = avatar_url.split("?")[0] + ".png"
-        api_url = f"https://some-random-api.ml/canvas/petpet?avatar={avatar_url}"
-        try:
-            timeout = aiohttp.ClientTimeout(total=10)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(api_url) as resp:
-                    if resp.status == 200:
-                        gif_bytes = await resp.read()
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".gif") as tmpfile:
-                            tmpfile.write(gif_bytes)
-                            tmpfile_path = tmpfile.name
-                        file = File(tmpfile_path, file_name="petpet.gif")
-                        await ctx.send(f"{user.mention} receives a legendary Aeternum petpet! 🐾\nMay your luck in expeditions increase!", files=[file])
-                    else:
-                        try:
-                            error_json = await resp.json()
-                            error_msg = error_json.get("error") or error_json.get("message") or "API error"
-                        except Exception:
-                            error_msg = "API error"
-                        await ctx.send(f"Failed to conjure a petpet GIF: {error_msg}\nThe spirits of Aeternum are restless.", ephemeral=True)
-        except (aiohttp.ClientConnectorError, aiohttp.ClientOSError):
-            await ctx.send("The petpet ritual failed. The winds of Aeternum disrupt the connection. Try again soon!", ephemeral=True)
-        except asyncio.TimeoutError:
-            await ctx.send("The petpet spirits are slow to answer. Please try again later.", ephemeral=True)
-        except Exception as e:
-            logging.error(f"Error connecting to petpet API: {e}")
-            await ctx.send("A mysterious error occurred during the petpet ritual. Try again later!", ephemeral=True)
+        await ctx.send(f"✨ {user.mention} receives a magical petpet ritual from the winds of Aeternum! 🐾")
     except Exception as e:
-        logging.error(f"Error in /petpet command: {e}")
-        await ctx.send(f"An ancient error has occurred while summoning the petpet GIF: {e}", ephemeral=True)
+        logging.exception(f"Error in petpet command: {e}")
+        await ctx.send("The petpet ritual failed. The winds of Aeternum disrupt the connection. Try again soon!", ephemeral=True)
 
 
-@slash_command("randomgif", description="Send a random GIF from Tenor")
-async def randomgif(ctx: interactions.SlashContext):
-    TENOR_API_KEY = os.getenv("TENOR_API_KEY")
-    if not TENOR_API_KEY:
-        await ctx.send("Tenor API key is not set. Please set TENOR_API_KEY in your .env file.", ephemeral=True)
-        return
+# --- /calculate command ---
+@slash_command("calculate", description="Perform a calculation with New World magic!")
+@slash_option("expression", "The mathematical expression to calculate", opt_type=interactions.OptionType.STRING, required=True)
+async def calculate(ctx: interactions.SlashContext, expression: str):
     try:
-        async with aiohttp.ClientSession() as session:
-            # You can change the search term for more variety
-            search_term = random.choice(["funny", "meme", "cat", "dog", "gaming", "reaction", "random"])
-            url = f"https://tenor.googleapis.com/v2/search?q={search_term}&key={TENOR_API_KEY}&limit=20&media_filter=gif"
-            async with session.get(url) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    results = data.get("results", [])
-                    if not results:
-                        await ctx.send("No GIFs found.", ephemeral=True)
-                        return
-                    gif = random.choice(results)
-                    gif_url = gif["media_formats"]["gif"]["url"]
-                    await ctx.send(gif_url)
-                else:
-                    await ctx.send("Failed to fetch GIF from Tenor.", ephemeral=True)
+        # Safe eval for basic math (no builtins)
+        allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("_")}
+        result = eval(expression, {"__builtins__": {}}, allowed_names)
+        await ctx.send(f"🔮 The result of `{expression}` is `{result}`.")
     except Exception as e:
-        logging.error(f"Error in /randomgif command: {e}")
-        await ctx.send("An error occurred while fetching a GIF.", ephemeral=True)
-
-
-try:
-    bot.start(bot_token)
-except Exception as e:
-    logging.error(f"Failed to start the bot: {e}")
+        await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
 
 
 @bot.event()
