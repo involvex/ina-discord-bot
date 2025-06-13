@@ -4,37 +4,17 @@ import random
 import logging
 import asyncio
 import uuid
+import math
 import unicodedata
 import re
 import items
-import interactions
-import math
-from thefuzz import process
-from dotenv import load_dotenv
+from interactions import Client, slash_command, slash_option, OptionType
 from typing import Optional
-import aiohttp
-
-from interactions import (
-    Client,
-    listen,
-    slash_command,
-    BrandColours,
-    slash_option,
-    File,
-    ButtonStyle,
-    ModalContext
-)
+from recipes import get_recipe, calculate_crafting_materials
 
 # Load environment variables from .env file
+from dotenv import load_dotenv
 load_dotenv()
-
-try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-except ImportError:
-    print("Failed to import watchdog. Code reloading will not work.")
-    Observer = None
-    FileSystemEventHandler = None
 
 logging.basicConfig(
     level=logging.INFO,
@@ -44,25 +24,185 @@ logging.getLogger("interactions").setLevel(logging.DEBUG)
 
 DEBUG = True
 
-# Gemini AI import (with fallback)
-try:
-    import google.generativeai as genai
-except ImportError:
-    genai = None
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if GEMINI_API_KEY:
-    os.environ["GOOGLE_API_KEY"] = GEMINI_API_KEY
-
 bot_token = os.getenv("BOT_TOKEN")
-
 if not bot_token:
     print("Error: BOT_TOKEN not found in .env file. Please make sure it is set.")
     sys.exit(1)
 
 bot = Client(token=bot_token)
 
-# Add New World funny statuses and details (from appid.py)
+
+@slash_command("ping", description="Check if the bot is online.")
+async def ping(ctx):
+    await ctx.send("Pong! Ina is online.")
+
+
+@slash_command("help", description="Show all available commands and their descriptions")
+@slash_option("command", "Get detailed help for a specific command", opt_type=OptionType.STRING, required=False)
+async def help_command(ctx, command: Optional[str] = None):
+    commands = {
+        "ping": "Check if the bot is online.",
+        "petpet": "Give a New World petting ritual to a user!",
+        "calculate": "Perform a calculation with New World magic!",
+        "nwdb": "Look up items from New World Database.",
+    }
+    if command and command.lower() in commands:
+        await ctx.send(f"**/{command.lower()}**: {commands[command.lower()]}")
+    else:
+        help_text = "\n".join([f"**/{cmd}**: {desc}" for cmd, desc in commands.items()])
+        await ctx.send(f"**Ina's New World Bot Commands:**\n{help_text}")
+
+
+@slash_command("petpet", description="Give a New World petting ritual to a user!")
+@slash_option("user", "The user to pet (Aeternum style)", opt_type=OptionType.USER, required=True)
+async def petpet(ctx, user):
+    await ctx.send(f"✨ {user.mention} receives a magical petpet ritual from the winds of Aeternum! 🐾")
+
+
+@slash_command("calculate", description="Perform a calculation with New World magic!")
+@slash_option("expression", "The mathematical expression to calculate", opt_type=OptionType.STRING, required=True)
+async def calculate(ctx, expression: str):
+    try:
+        allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("_")}
+        result = eval(expression, {"__builtins__": {}}, allowed_names)
+        await ctx.send(f"🔮 The result of `{expression}` is `{result}`.")
+    except Exception as e:
+        await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
+
+
+@slash_command("nwdb", description="Look up items from New World Database.")
+@slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
+async def nwdb(ctx, item_name: str):
+    # Load items from CSV
+    item_data = items.load_items_from_csv('items.csv')
+    if not item_data:
+        await ctx.send("Could not load item data.", ephemeral=True)
+        return
+    item_name_lower = item_name.lower()
+    if item_name_lower not in item_data:
+        await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
+        return
+    item = item_data[item_name_lower]
+    def get_any(item, keys, default):
+        for k in keys:
+            if k in item and item[k]:
+                return item[k]
+        return default
+    name = get_any(item, ['name', 'Name', 'Item Name'], item_name)
+    description = get_any(item, ['description', 'Description', 'Flavor Text'], 'No description available.')
+    rarity = get_any(item, ['rarity', 'Rarity'], 'Unknown')
+    tier = get_any(item, ['tier', 'Tier'], 'Unknown')
+    icon_url = get_any(item, ['icon', 'Icon', 'Icon Path', 'icon_url'], None)
+    # Build a NWDB-style embed
+    from interactions import Embed
+    embed = Embed()
+    embed.title = name
+    embed.color = 0x9b59b6 if rarity.lower() == 'artifact' else 0x7289da
+    if icon_url:
+        embed.set_thumbnail(url=icon_url)
+    embed.add_field(name="Rarity", value=rarity, inline=True)
+    embed.add_field(name="Tier", value=tier, inline=True)
+    if description and not description.startswith('Artifact_'):
+        embed.add_field(name="Description", value=description, inline=False)
+    # Add more NWDB-style fields if available
+    # Example: Gear Score, Perks, etc.
+    gear_score = get_any(item, ['gear_score', 'Gear Score', 'GS'], None)
+    if gear_score:
+        embed.add_field(name="Gear Score", value=str(gear_score), inline=True)
+    # Perks (if present)
+    perks = get_any(item, ['perks', 'Perks'], None)
+    # Perk pretty names and icons mapping (expand as needed)
+    PERK_PRETTY = {
+        'PerkID_Artifact_Set1_HeavyChest': ("Artifact Set: Heavy Chest", "🟣"),
+        'PerkID_Gem_EmptyGemSlot': ("Empty Gem Slot", "💠"),
+        'PerkID_Armor_DefBasic': ("Basic Defense", "🛡️"),
+        'PerkID_Armor_RangeDefense_Physical': ("Ranged Physical Defense", "🏹"),
+        # Add more known perks here...
+    }
+    if perks:
+        perk_lines = []
+        for perk in str(perks).split(","):
+            perk = perk.strip()
+            if not perk:
+                continue
+            pretty, icon = PERK_PRETTY.get(perk, (perk, '•'))
+            perk_lines.append(f"{icon} {pretty}")
+        if perk_lines:
+            embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
+    # If item is craftable, mention calculate_craft
+    if get_recipe(item_name):
+        embed.set_footer(text=f"Type /calculate_craft item_name:{item_name} amount:4 to calculate resources!")
+    await ctx.send(embeds=embed)
+
+
+@nwdb.autocomplete("item_name")
+async def nwdb_autocomplete(ctx):
+    # Provide autocomplete suggestions from items.csv
+    item_data = items.load_items_from_csv('items.csv')
+    if not item_data:
+        await ctx.send(choices=[])
+        return
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    matches = [name for name in item_data.keys() if search_term in name]
+    # Discord allows max 25 choices
+    choices = [{"name": name, "value": name} for name in list(matches)[:25]]
+    await ctx.send(choices=choices)
+
+
+@slash_command("calculate_craft", description="Calculate base resources needed to craft an item.")
+@slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
+@slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
+async def calculate_craft(ctx, item_name: str, amount: int = 1):
+    recipe = get_recipe(item_name)
+    if not recipe:
+        await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
+        return
+    base_materials = calculate_crafting_materials(item_name, amount or 1)
+    if not base_materials:
+        await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
+        return
+    lines = [f"To craft {amount or 1} **{item_name.title()}** you need:"]
+    for mat, qty in base_materials.items():
+        lines.append(f"• {qty} {mat.title()}")
+    await ctx.send("\n".join(lines))
+
+
+@calculate_craft.autocomplete("item_name")
+async def calculate_craft_autocomplete(ctx):
+    # Suggest craftable items from recipes.py
+    from recipes import RECIPES
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    matches = [name for name in RECIPES.keys() if search_term in name]
+    choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
+    await ctx.send(choices=choices)
+
+
+# Mention handler
+@bot.event()
+async def on_message_create(event):
+    message = getattr(event, "message", None) or getattr(event, "data", None)
+    if not message:
+        return
+    author = getattr(message, "author", None)
+    if not author or getattr(author, "bot", False):
+        return
+    bot_self = getattr(bot, "me", None) or getattr(bot, "user", None)
+    if not bot_self or not hasattr(bot_self, "id"):
+        return
+    bot_id = str(getattr(bot_self, "id", None))
+    mentions = getattr(message, "mentions", []) or []
+    mentioned_ids = {str(m.id) for m in mentions if hasattr(m, 'id')}
+    content = getattr(message, "content", "") or getattr(message, "text", "")
+    if bot_id in mentioned_ids or f"<@{bot_id}>" in content:
+        channel_id = getattr(message, "channel_id", None)
+        if channel_id:
+            channel = await bot.fetch_channel(channel_id)
+            # Only send if channel supports send (TextChannel, not GuildForum, GuildCategory, or None)
+            if channel and hasattr(channel, 'send') and channel.__class__.__name__ == 'TextChannel':
+                await channel.send("👋 The winds of Aeternum greet you! Use `/help` to see my commands.")
+
+
+# --- New World funny status (RPC) rotation ---
 NW_FUNNY_STATUSES = [
     {"name": "Truthahn des Schreckens", "state": "Wird gejagt... oder jagt?"},
     {"name": "Hanf für... Seile", "state": "Medizinische Zwecke, schwöre!"},
@@ -77,7 +217,7 @@ NW_FUNNY_STATUSES = [
     {"name": "Crafting-Wahnsinn", "state": "Kunst oder Schrott?"},
     {"name": "Expeditionen", "state": "Heiler hat Aggro. Klassiker."},
     {"name": "PvP", "state": "Sucht Streit, findet den Boden."},
-    {"name": "Open World PvP", "state": "Von 5er-Gruppe 'gefairplayt'."},
+    {"name": "Open World PvP", "state": "Von 5er-Gruppe 'gefairplayt.'"},
     {"name": "Belagerungskriege", "state": "Popcorn für die Lag-Show."},
     {"name": "Ganking 101", "state": "Plant episch, wird gegankt."},
     {"name": "PvP mit 1 HP", "state": "'Strategie', nicht Glück."},
@@ -98,921 +238,27 @@ NW_FUNNY_STATUSES = [
     {"name": "stumme Mitspieler", "state": "Konzentriert oder Bot?"}
 ]
 
-NW_EXTRA_DETAILS = [
-    "Level 60 • Großaxt-Meister",
-    "Territorium: Immerfall",
-    "Company: Die Verlorenen",
-    "Wassermark: 625",
-    "Gold: 3.50 (arm aber sexy)",
-    "Azoth: 0 (klassisch)",
-    "Reparatur-Teile: ∞ (brauch ich)",
-    "Handwerk: Waffenschmied 200",
-    "Trading Post Sniper",
-    "Expeditionen gecleart: 247",
-    "PvP K/D: 0.3 (stolz drauf)",
-    "Stunden gespielt: Zu viele",
-    "Lieblings-Gebiet: Weavers Fen",
-    "Hasst: Dynastien-Schiffbruch",
-    "Status: Überlebt... knapp"
-]
-
-if Observer and FileSystemEventHandler:
-
-    class CodeChangeHandler(FileSystemEventHandler):
-        def __init__(self, bot):
-            self.bot = bot
-            super().__init__()
-
-        def on_modified(self, event):
-            if event.is_directory:
-                return
-            # Ensure src_path is a string and endswith uses a tuple of str
-            if isinstance(event.src_path, str) and event.src_path.endswith(tuple([".py"])):
-                print(f"Code change detected in {event.src_path}. Reloading...")
-                asyncio.create_task(self.reload_bot())
-
-        async def reload_bot(self):
-            for extension in list(bot.ext):
-                try:
-                    bot.unload_extension(extension)
-                    print(f"Unloaded extension: {extension}")
-                except Exception as e:
-                    print(f"Failed to unload extension {extension}: {e}")
-
-            extensions_dir = os.path.dirname(os.path.abspath(__file__))
-            for filename in os.listdir(extensions_dir):
-                if filename.endswith(".py") and filename != "main.py":
-                    extension = filename[:-3]
-                    try:
-                        bot.load_extension(extension)
-                        print(f"Loaded extension: {extension}")
-                    except Exception as e:
-                        print(f"Failed to load extension {extension}: {e}")
-else:
-    print("Watchdog is not available. Code reloading will not work.")
-
-    class CodeChangeHandler:
-        pass
-
-
-@listen()
-async def on_startup():
-    print(f"Logged in as {bot.user}")
-
-
 async def rotate_funny_presence(bot, interval=60):
     await bot.wait_until_ready()
     while True:
         status = random.choice(NW_FUNNY_STATUSES)
-        detail = random.choice(NW_EXTRA_DETAILS)
-        funny_status = f"{status['name']} – {status['state']} | {detail}"
+        funny_status = f"{status['name']} – {status['state']}"
         await bot.change_presence(
-            status=interactions.Status.ONLINE,
-            activity=interactions.Activity(
-                name=funny_status,
-                type=interactions.ActivityType.GAME
-            )
+            activity={
+                "name": funny_status,
+                "type": 0  # 0 = Playing
+            }
         )
         await asyncio.sleep(interval)
 
 
 @bot.event()
 async def on_ready():
-    print("I am ready!")
-    logging.info(f"Bot is connected as {bot.user.username} (ID: {bot.user.id})")
-    # Start rotating funny New World statuses in the background
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
 
 
-@slash_command("ping")
-async def ping(ctx):
-    action_rows = [
-        interactions.ActionRow(
-            interactions.Button(
-                style=interactions.ButtonStyle.DANGER,
-                label="Danger Button",
-            )
-        )
-    ]
-
-    embed = interactions.Embed()
-    embed.title = "Pong!"
-    embed.description = "Pong!"
-    embed.color = BrandColours.BLURPLE
-    for i in range(5):
-        embed.add_field(name=f"Field {i}", value=f"Value {uuid.uuid4()}")
-    if DEBUG:
-        embed.add_field(name="Debug Info", value=f"Python: {sys.version}\nJurigged: Active\nTime: {uuid.uuid4()}")
-
-    await ctx.send("Pong!", components=action_rows, embeds=embed)
-
-
-@slash_command("components")
-async def components(ctx):
-    selects = [
-        [interactions.ChannelSelectMenu()],
-        [interactions.RoleSelectMenu()],
-        [interactions.UserSelectMenu()],
-        [interactions.MentionableSelectMenu()],
-        [interactions.StringSelectMenu("test", "test 2", "test 3")],
-    ]
-    await ctx.send("Select menus", components=selects)
-    await ctx.send(
-        "Buttons",
-        components=[interactions.Button(label="test", style=ButtonStyle.PRIMARY)],
-    )
-
-
-@slash_command("help", description="Show all available commands and their descriptions")
-@slash_option("command", "Get detailed help for a specific command", opt_type=interactions.OptionType.STRING, required=False)
-async def help_command(ctx: interactions.SlashContext, command: Optional[str] = None):
-    if command:
-        command = command.lower().strip()
-        command_details = {
-            "nwdb": {
-                "title": "🎮 New World Database Lookup",
-                "description": "Look up items from New World Database",
-                "usage": "/nwdb [item_name]",
-                "parameters": [
-                    {"name": "item_name", "description": "The name of the item to look up (with autocomplete)"}
-                ],
-                "examples": ["/nwdb iron ingot", "/nwdb orichalcum"],
-                "notes": "• Shows detailed item information\n• Includes crafting recipes when available\n• Calculate button lets you determine resources needed for multiple crafts"
-            },
-            "calculator": {
-                "title": "🧮 Calculator",
-                "description": "Perform mathematical calculations with support for various functions",
-                "usage": "/calculator [expression]",
-                "parameters": [
-                    {"name": "expression", "description": "The mathematical expression to calculate"}
-                ],
-                "notes": "• Supports basic operations: +, -, *, /, ^\n• Functions: sin, cos, tan, asin, acos, atan, sqrt, cbrt\nlog, log10, log2, abs, round, floor, ceil, trunc\n• Constants: pi, e"
-            },
-            "ask": {
-                "title": "🤖 Ask Gemini AI",
-                "description": "Ask questions to Google's Gemini AI model",
-                "usage": "/ask [prompt]",
-                "parameters": [
-                    {"name": "prompt", "description": "Your question for Gemini AI"}
-                ],
-                "examples": ["/ask What is the capital of France?", "/ask Explain quantum computing"],
-                "notes": "• Powered by Google's Gemini 2.0 Flash model\n• Responses may be truncated if they exceed Discord's character limit"
-            },
-            "ping": {
-                "title": "📡 Ping",
-                "description": "Check if the bot is online and responsive",
-                "usage": "/ping",
-                "parameters": [],
-                "examples": ["/ping"],
-                "notes": "• Shows debug information when debug mode is enabled"
-            },
-            "debug": {
-                "title": "⚙️ Debug",
-                "description": "Toggle debug mode or check debug status",
-                "usage": "/debug [mode]",
-                "parameters": [
-                    {"name": "mode", "description": "Turn debug mode on or off (optional)"}
-                ],
-                "examples": ["/debug", "/debug on", "/debug off"],
-                "notes": "• Shows Python version and loaded extensions\n• Debug mode enables additional logging"
-            },
-            "record": {
-                "title": "🎙️ Record",
-                "description": "Record audio in your voice channel",
-                "usage": "/record [duration]",
-                "parameters": [
-                    {"name": "duration", "description": "The duration of the recording in seconds"}
-                ],
-                "examples": ["/record 30"],
-                "notes": "• You must be in a voice channel to use this command\n• Recordings are saved as MP3 files"
-            },
-            "petpet": {
-                "title": "🐾 Petpet",
-                "description": "Generate a petpet GIF for a user",
-                "usage": "/petpet @user",
-                "parameters": [
-                    {"name": "user", "description": "The user to pet"}
-                ],
-                "examples": ["/petpet @Inas"],
-                "notes": "• Generates a fun animated petpet GIF for the mentioned user"
-            },
-            "randomgif": {
-                "title": "🎲 Random GIF",
-                "description": "Send a random GIF from Tenor",
-                "usage": "/randomgif",
-                "parameters": [],
-                "examples": ["/randomgif"],
-                "notes": "• Returns a random trending/fun GIF from Tenor"
-            }
-        }
-
-        if command in command_details:
-            details = command_details[command]
-            embed = interactions.Embed()
-            embed.title = details["title"]
-            embed.description = details["description"]
-            embed.color = BrandColours.BLURPLE
-            embed.add_field(name="Usage", value=f"```{details['usage']}```", inline=False)
-            if details["parameters"]:
-                param_str = "\n".join([f"**{p['name']}**: {p['description']}" for p in details["parameters"]])
-                embed.add_field(name="Parameters", value=param_str, inline=False)
-            if details.get("examples"):
-                example_str = "\n".join(details["examples"])
-                embed.add_field(name="Examples", value=example_str, inline=False)
-            if details.get("notes"):
-                embed.add_field(name="Notes", value=details["notes"], inline=False)
-            await ctx.send(embeds=embed)
-            return
-        else:
-            await ctx.send(f"No detailed help available for command: `{command}`\nUse `/help` to see all available commands.", ephemeral=True)
-            return
-
-    help_embed = interactions.Embed()
-    help_embed.title = "📚 Ina's New World Bot Commands"
-    help_embed.description = "Welcome to Aeternum! Here are all the commands you can use to enhance your Discord adventures:"
-    help_embed.color = BrandColours.BLURPLE
-    help_embed.add_field(
-        name="🎮 Game Commands",
-        value="**/nwdb** `item_name` - Look up an item from New World Database\n→ Shows item details and crafting recipes",
-        inline=False
-    )
-    help_embed.add_field(
-        name="🔧 Utility Commands",
-        value="**/calculator** `expression` - Perform mathematical calculations\n**/ask** `prompt` - Ask Gemini AI a question\n**/ping** - Check if the bot is online\n**/help** - Show this help message",
-        inline=False
-    )
-    help_embed.add_field(
-        name="🎉 Fun Commands",
-        value="**/petpet** `@user` - Perform a New World petting ritual on a user (summons a magical petpet GIF)\n**/randomgif** - Get a random GIF from Tenor",
-        inline=False
-    )
-    help_embed.add_field(
-        name="⚙️ Advanced Commands",
-        value="**/debug** `mode` - Toggle debug mode or check status\n**/record** `duration` - Record audio in your voice channel\n**/components** - Show UI component examples",
-        inline=False
-    )
-    help_embed.set_footer(text="Use /help <command> for more details on a specific command. May the winds of Aeternum guide you!")
-    await ctx.send(embeds=help_embed)
-
-
-@slash_command("debug", description="Toggle debug mode or check debug status")
-@slash_option("mode", "Turn debug mode on or off", opt_type=interactions.OptionType.STRING, required=False, choices=[
-    {"name": "On", "value": "on"},
-    {"name": "Off", "value": "off"}
-])
-async def debug_command(ctx: interactions.SlashContext, mode: Optional[str] = None):
-    global DEBUG
-    if mode:
-        if mode.lower() == "on":
-            DEBUG = True
-            await ctx.send("Debug mode enabled", ephemeral=True)
-        elif mode.lower() == "off":
-            DEBUG = False
-            await ctx.send("Debug mode disabled", ephemeral=True)
-    else:
-        embed = interactions.Embed(
-            title="Debug Information",
-            description=f"Debug Mode: {'Enabled' if DEBUG else 'Disabled'}",
-            color=BrandColours.BLURPLE
-        )
-        embed.add_field(name="Python Version", value=sys.version.split()[0])
-        embed.add_field(name="Jurigged Status", value="Active" if "jurigged" in sys.modules else "Inactive")
-        embed.add_field(name="Loaded Extensions", value=", ".join(bot.ext.keys()) if bot.ext else "None")
-        await ctx.send(embeds=embed, ephemeral=True)
-
-
-@slash_command("record", description="Record audio in your voice channel")
-@slash_option("duration", "The duration of the recording", opt_type=interactions.OptionType.NUMBER, required=True)
-async def record(ctx: interactions.SlashContext, duration: int) -> None:
+if __name__ == "__main__":
     try:
-        if not hasattr(ctx, 'guild') or ctx.guild is None:
-            await ctx.send("This command can only be used in a server.")
-            return
-        voice_state = getattr(ctx.guild, 'get_voice_state', lambda x: None)(ctx.author.id)
-        if not voice_state or not getattr(voice_state, 'channel', None):
-            await ctx.send("You must be in a voice channel to use this command.")
-            return
-
-        voice_channel = voice_state.channel
-        voice_state = await voice_channel.connect()
-
-        recorder = await voice_state.start_recording()
-        await ctx.send(f"Recording for {duration} seconds")
-        await asyncio.sleep(duration)
-        await voice_state.stop_recording()
-
-        await ctx.send(
-            "Here is your recording", files=[File(f, file_name=f"{user_id}.mp3") for user_id, f in recorder.output.items()]
-        )
+        bot.start()
     except Exception as e:
-        logging.exception(f"Error in record command: {e}")
-        await ctx.send(f"An error occurred while recording: {e}")
-
-
-@slash_command("modal")
-async def modal(ctx):
-    _modal = interactions.Modal(
-        interactions.ShortText(
-            label="Number of Crafts",
-            placeholder="Placeholder",
-            required=True,
-            min_length=5,
-            max_length=10,
-        ),
-        interactions.ParagraphText(
-            label="Paragraph Text",
-            placeholder="Placeholder",
-            required=True,
-            min_length=5,
-            max_length=10,
-        ),
-        title="Modal",
-    )
-    await ctx.send_modal(_modal)
-
-
-@listen()
-async def on_component(event: interactions.events.Component):
-    ctx: interactions.ComponentContext = event.ctx
-
-    if ctx.custom_id.startswith("calculate_crafts:"):
-        item_name = ctx.custom_id.split(":")[1]
-        modal_id = f"craft_modal:{item_name}"
-        craft_modal = interactions.Modal(
-            interactions.ShortText(
-                label="Number of Crafts",
-                placeholder="Enter the number of crafts",
-                custom_id=f"num_crafts:{item_name}",
-                required=True,
-                min_length=5,
-                max_length=10
-            ),
-            title=f"Calculate Crafts for {item_name}",
-            custom_id=modal_id
-        )
-        await ctx.send_modal(craft_modal)
-    elif ctx.custom_id.startswith("calc_copy:"):
-        result = ctx.custom_id.split(":", 1)[1]
-        await ctx.send(f"```{result}```", ephemeral=True)
-    elif ctx.custom_id == "calc_help":
-        help_embed = interactions.Embed(
-            title="📊 Calculator Help",
-            description="Here are the available functions and operations you can use:",
-            color=BrandColours.BLURPLE
-        )
-
-        help_embed.add_field(
-            name="Basic Operations",
-            value="+ (addition)\n- (subtraction)\n* (multiplication)\n/ (division)\n^ or ** (exponentiation)",
-            inline=True
-        )
-
-        help_embed.add_field(
-            name="Constants",
-            value="pi (π = 3.14159...)\ne (Euler's number = 2.71828...)",
-            inline=True
-        )
-
-        help_embed.add_field(
-            name="Functions",
-            value="sin, cos, tan\nasin, acos, atan\nsqrt, cbrt\nlog, log10, log2\nabs, round\nfloor, ceil, trunc",
-            inline=True
-        )
-
-        await ctx.send(embeds=help_embed, ephemeral=True)
-        item_name = ctx.custom_id.split(":")[1]
-        modal_id = f"craft_modal:{item_name}"
-        craft_modal = interactions.Modal(
-            interactions.ShortText(
-                label="Number of Crafts",
-                placeholder="Enter the number of crafts",
-                custom_id=f"num_crafts:{item_name}",
-                required=True,
-                min_length=5,
-                max_length=10
-            ),
-            title=f"Calculate Crafts for {item_name}",
-            custom_id=modal_id
-        )
-        await ctx.send_modal(craft_modal)
-
-
-@listen()
-async def on_modal(event):
-    ctx: ModalContext = event.ctx
-
-    if DEBUG:
-        logging.info(f"Modal responses: {ctx.responses}")
-        logging.info(f"Modal custom_id: {ctx.custom_id}")
-
-    if "craft_modal:" in ctx.custom_id:
-        try:
-            item_name = ctx.custom_id.split(":")[1]
-        except IndexError:
-            await ctx.send("Could not determine item name.", ephemeral=True)
-            return
-
-        try:
-            num_crafts_str = list(ctx.responses.values())[0]
-        except (IndexError, AttributeError):
-            await ctx.send("Could not get number of crafts from the form.", ephemeral=True)
-            return
-
-        try:
-            num_crafts = int(num_crafts_str)
-            if num_crafts <= 0:
-                await ctx.send("Please enter a positive number.", ephemeral=True)
-                return
-        except ValueError:
-            await ctx.send("Please enter a valid number.", ephemeral=True)
-            return
-
-        item_data = items.load_items_from_csv('items.csv')
-        if not item_data:
-            await ctx.send("Could not load item data.", ephemeral=True)
-            return
-
-        item_name_lower = item_name.lower()
-
-        if item_name_lower not in item_data:
-            await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
-            return
-
-        item = item_data[item_name_lower]
-
-        logging.info(f"Loaded item: {item}")
-
-        try:
-            # --- Build rich embed for item info or recipe ---
-            # Use case-insensitive keys for all lookups
-            def get_key(keys):
-                for k in item.keys():
-                    if k.lower() in [key.lower() for key in keys]:
-                        return k
-                return None
-
-            # Title
-            title = item.get(get_key(['Name', 'name', 'Item Name']), 'Unknown Item')
-            description = item.get(get_key(['Description', 'description', 'Flavor Text']), '')
-            icon_url = item.get(get_key(['Icon', 'icon', 'Icon Path', 'icon_url']), '')
-            tier = item.get(get_key(['Tier', 'tier']), '')
-            rarity = item.get(get_key(['Rarity', 'rarity']), '')
-            gear_score = item.get(get_key(['Gear Score', 'base_gear_score', 'Base Gear Score']), '')
-            weight = item.get(get_key(['Weight', 'weight']), '')
-            durability = item.get(get_key(['Durability', 'durability']), '')
-            max_stack = item.get(get_key(['Max Stack Size', 'max_stack', 'Max Stack']), '')
-            item_type = item.get(get_key(['Item Type', 'resource_type', 'Type']), '')
-            perks = item.get(get_key(['Perks', 'perks']), '')
-
-            embed = interactions.Embed()
-            embed.title = title
-            embed.description = description
-            embed.color = BrandColours.GREEN if item_type else BrandColours.BLURPLE
-
-            # Main Info Section
-            info_lines = []
-            if gear_score:
-                info_lines.append(f"**Gear Score:** {gear_score}")
-            if weight:
-                info_lines.append(f"**Weight:** {weight}")
-            if durability:
-                info_lines.append(f"**Durability:** {durability}")
-            if max_stack:
-                info_lines.append(f"**Max Stack:** {max_stack}")
-            if tier:
-                info_lines.append(f"**Tier:** {tier}")
-            if rarity:
-                info_lines.append(f"**Rarity:** {rarity}")
-            if item_type:
-                info_lines.append(f"**Type:** {item_type}")
-            if info_lines:
-                embed.add_field(name="Info", value="\n".join(info_lines), inline=False)
-
-            # Perks (try to split and add icons/images like nwdb.info)
-            if perks:
-                perk_lines = []
-                for perk in str(perks).split(","):
-                    perk = perk.strip()
-                    # Try to pretty-print known perks (replace IDs with readable names)
-                    pretty = perk
-                    if perk.startswith('PerkID_'):
-                        pretty = perk.replace('PerkID_', '').replace('_', ' ').title()
-                    # Map perk keywords to NWDB-style unicode or emoji icons
-                    if 'gem' in perk.lower() or 'socket' in perk.lower():
-                        icon = '💠'
-                    elif 'random' in perk.lower():
-                        icon = '🎲'
-                    elif 'awareness' in perk.lower():
-                        icon = '🧠'
-                    elif 'hearty' in perk.lower():
-                        icon = '💚'
-                    elif 'affinity' in perk.lower():
-                        icon = '✨'
-                    elif 'magnify' in perk.lower():
-                        icon = '🔆'
-                    elif 'sentry' in perk.lower():
-                        icon = '🛡️'
-                    elif 'refreshing' in perk.lower():
-                        icon = '💧'
-                    elif 'enchanted' in perk.lower():
-                        icon = '🪄'
-                    elif 'foundation' in perk.lower():
-                        icon = '🏗️'
-                    elif 'ward' in perk.lower():
-                        icon = '🛡️'
-                    elif 'cooldown' in perk.lower():
-                        icon = '⏱️'
-                    elif 'stamina' in perk.lower():
-                        icon = '⚡'
-                    elif 'attribute' in perk.lower():
-                        icon = '🔹'
-                    else:
-                        icon = '•'
-                    perk_lines.append(f"{icon} {pretty}")
-                embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
-
-            # Add main item icon (top left)
-            # Try to use Hi Res Icon Path, Icon Path, or icon_url (in that order)
-            icon_url = (
-                item.get(get_key(['Hi Res Icon Path', 'hi_res_icon_path']), '') or
-                item.get(get_key(['Icon Path', 'icon_path', 'Icon']), '') or
-                item.get(get_key(['icon_url', 'Icon_Url']), '')
-            )
-            if icon_url:
-                embed.set_thumbnail(url=icon_url)
-
-            # Add big gear score icon if available
-            if gear_score:
-                # Use a custom emoji or Unicode for the gear score icon
-                embed.add_field(name="\u200b", value=f"<:nwdb_gear:> **{gear_score}**", inline=False)
-
-            # Add more fields for stats if available (e.g., Armor Rating, etc.)
-            armor_rating_elem = item.get(get_key(['Armor Rating - Elemental', 'armor_rating_elemental']), '')
-            armor_rating_phys = item.get(get_key(['Armor Rating - Physical', 'armor_rating_physical']), '')
-            if armor_rating_elem or armor_rating_phys:
-                stats = []
-                if armor_rating_elem:
-                    stats.append(f"{armor_rating_elem} Armor Rating - Elemental")
-                if armor_rating_phys:
-                    stats.append(f"{armor_rating_phys} Armor Rating - Physical")
-                embed.add_field(name="Stats", value="\n".join(stats), inline=False)
-
-            # Add flavor text/description in italics if available
-            if description:
-                embed.add_field(name="\u200b", value=f"*{description}*", inline=False)
-
-            await ctx.send(embeds=embed)
-        except Exception as e:
-            logging.exception(f"Error in nwdb command: {e}")
-            await ctx.send("An error occurred while processing your request.", ephemeral=True)
-
-
-@slash_command(name="nwdb", description="Look up items from New World Database")
-@slash_option(name="item_name", description="The name of the item to look up", opt_type=interactions.OptionType.STRING, required=True, autocomplete=True)
-async def nwdb(ctx: interactions.SlashContext, item_name: str):
-    try:
-        item_data = items.load_items_from_csv('items.csv')
-        if not item_data:
-            await ctx.send("No item data found. Please contact the server administrator.", ephemeral=True)
-            return
-
-        item_name_lower = item_name.lower()
-        if item_name_lower not in item_data:
-            await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
-            return
-
-        item = item_data[item_name_lower]
-
-        logging.info(f"Loaded item: {item}")
-
-        try:
-            # --- Build rich embed for item info or recipe ---
-            # Use case-insensitive keys for all lookups
-            def get_key(keys):
-                for k in item.keys():
-                    if k.lower() in [key.lower() for key in keys]:
-                        return k
-                return None
-
-            # Title
-            title = item.get(get_key(['Name', 'name', 'Item Name']), 'Unknown Item')
-            description = item.get(get_key(['Description', 'description', 'Flavor Text']), '')
-            icon_url = item.get(get_key(['Icon', 'icon', 'Icon Path', 'icon_url']), '')
-            tier = item.get(get_key(['Tier', 'tier']), '')
-            rarity = item.get(get_key(['Rarity', 'rarity']), '')
-            gear_score = item.get(get_key(['Gear Score', 'base_gear_score', 'Base Gear Score']), '')
-            weight = item.get(get_key(['Weight', 'weight']), '')
-            durability = item.get(get_key(['Durability', 'durability']), '')
-            max_stack = item.get(get_key(['Max Stack Size', 'max_stack', 'Max Stack']), '')
-            item_type = item.get(get_key(['Item Type', 'resource_type', 'Type']), '')
-            perks = item.get(get_key(['Perks', 'perks']), '')
-
-            embed = interactions.Embed()
-            embed.title = title
-            embed.description = description
-            embed.color = BrandColours.GREEN if item_type else BrandColours.BLURPLE
-
-            # Main Info Section
-            info_lines = []
-            if gear_score:
-                info_lines.append(f"**Gear Score:** {gear_score}")
-            if weight:
-                info_lines.append(f"**Weight:** {weight}")
-            if durability:
-                info_lines.append(f"**Durability:** {durability}")
-            if max_stack:
-                info_lines.append(f"**Max Stack:** {max_stack}")
-            if tier:
-                info_lines.append(f"**Tier:** {tier}")
-            if rarity:
-                info_lines.append(f"**Rarity:** {rarity}")
-            if item_type:
-                info_lines.append(f"**Type:** {item_type}")
-            if info_lines:
-                embed.add_field(name="Info", value="\n".join(info_lines), inline=False)
-
-            # Perks (try to split and add icons/images like nwdb.info)
-            if perks:
-                perk_lines = []
-                for perk in str(perks).split(","):
-                    perk = perk.strip()
-                    # Try to pretty-print known perks (replace IDs with readable names)
-                    pretty = perk
-                    if perk.startswith('PerkID_'):
-                        pretty = perk.replace('PerkID_', '').replace('_', ' ').title()
-                    # Map perk keywords to NWDB-style unicode or emoji icons
-                    if 'gem' in perk.lower() or 'socket' in perk.lower():
-                        icon = '💠'
-                    elif 'random' in perk.lower():
-                        icon = '🎲'
-                    elif 'awareness' in perk.lower():
-                        icon = '🧠'
-                    elif 'hearty' in perk.lower():
-                        icon = '💚'
-                    elif 'affinity' in perk.lower():
-                        icon = '✨'
-                    elif 'magnify' in perk.lower():
-                        icon = '🔆'
-                    elif 'sentry' in perk.lower():
-                        icon = '🛡️'
-                    elif 'refreshing' in perk.lower():
-                        icon = '💧'
-                    elif 'enchanted' in perk.lower():
-                        icon = '🪄'
-                    elif 'foundation' in perk.lower():
-                        icon = '🏗️'
-                    elif 'ward' in perk.lower():
-                        icon = '🛡️'
-                    elif 'cooldown' in perk.lower():
-                        icon = '⏱️'
-                    elif 'stamina' in perk.lower():
-                        icon = '⚡'
-                    elif 'attribute' in perk.lower():
-                        icon = '🔹'
-                    else:
-                        icon = '•'
-                    perk_lines.append(f"{icon} {pretty}")
-                embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
-
-            # Add main item icon (top left)
-            # Try to use Hi Res Icon Path, Icon Path, or icon_url (in that order)
-            icon_url = (
-                item.get(get_key(['Hi Res Icon Path', 'hi_res_icon_path']), '') or
-                item.get(get_key(['Icon Path', 'icon_path', 'Icon']), '') or
-                item.get(get_key(['icon_url', 'Icon_Url']), '')
-            )
-            if icon_url:
-                embed.set_thumbnail(url=icon_url)
-
-            # Add big gear score icon if available
-            if gear_score:
-                # Use a custom emoji or Unicode for the gear score icon
-                embed.add_field(name="\u200b", value=f"<:nwdb_gear:> **{gear_score}**", inline=False)
-
-            # Add more fields for stats if available (e.g., Armor Rating, etc.)
-            armor_rating_elem = item.get(get_key(['Armor Rating - Elemental', 'armor_rating_elemental']), '')
-            armor_rating_phys = item.get(get_key(['Armor Rating - Physical', 'armor_rating_physical']), '')
-            if armor_rating_elem or armor_rating_phys:
-                stats = []
-                if armor_rating_elem:
-                    stats.append(f"{armor_rating_elem} Armor Rating - Elemental")
-                if armor_rating_phys:
-                    stats.append(f"{armor_rating_phys} Armor Rating - Physical")
-                embed.add_field(name="Stats", value="\n".join(stats), inline=False)
-
-            # Add flavor text/description in italics if available
-            if description:
-                embed.add_field(name="\u200b", value=f"*{description}*", inline=False)
-
-            await ctx.send(embeds=embed)
-        except Exception as e:
-            logging.exception(f"Error in nwdb command: {e}")
-            await ctx.send("An error occurred while processing your request.", ephemeral=True)
-    except Exception as e:
-        logging.exception(f"Error in nwdb command: {e}")
-        await ctx.send("An error occurred while processing your request.", ephemeral=True)
-
-
-@nwdb.autocomplete("item_name")
-async def nwdb_autocomplete(ctx: interactions.AutocompleteContext):
-    try:
-        if not ctx.input_text:
-            return []
-
-        search_term = ctx.input_text.lower().strip()
-        choices = []
-
-        try:
-            item_data = items.load_items_from_csv('items.csv')
-            if not item_data:
-                return []
-            
-            # Collect matching items
-            for item in item_data.values():
-                if len(choices) >= 25:  # Discord's limit
-                    break
-
-                try:
-                    item_name_column = next((col for col in item.keys() if col.lower() == 'name'), None)
-                    if not item_name_column:
-                        item_name_column = next((col for col in item.keys() if col.lower() in ['item_name', 'itemname']), None)
-                    
-                    if item_name_column and item[item_name_column]:
-                        item_name = str(item[item_name_column])
-                        if item_name.lower().startswith(search_term):
-                            truncated = truncate_discord_choice(item_name)
-                            utf16_len = len(truncated.encode('utf-16-le')) // 2
-                            if DEBUG:
-                                logging.info(f"Autocomplete candidate: '{truncated}' | len={len(truncated)} | utf16={utf16_len} | bytes={truncated.encode('utf-8')}")
-                            if truncated and utf16_len <= 25 and len(truncated) <= 25:
-                                choices.append({"name": truncated, "value": truncated})
-                            elif DEBUG:
-                                logging.error(f"Rejected autocomplete value: '{truncated}' (len={len(truncated)}, utf16={utf16_len}, bytes={truncated.encode('utf-8')})")
-
-                except Exception:
-                    continue
-
-            # Final check: ensure all names and values are strings and log the return value
-            if DEBUG:
-                logging.info(f"Sending autocomplete choices: {choices}")
-            await ctx.send(choices=choices)
-            # Do not return anything here
-        except Exception as e:
-            if DEBUG:
-                logging.error(f"Error processing items: {e}")
-            return []
-
-    except Exception as e:
-        logging.error(f"Error in autocomplete: {e}")
-        return []
-
-
-def truncate_discord_choice(s, max_codeunits=25):
-    s = unicodedata.normalize('NFC', s)
-    s = re.sub(r'[^\x20-\x7E\u00A0-\uFFFF]', '', s)  # keep only printable unicode
-    s = s.replace('\n', ' ').replace('\r', ' ').strip()
-    s = re.sub(r' +', ' ', s)
-    encoded = s.encode('utf-16-le')
-    if len(encoded) <= max_codeunits * 2:
-        return s
-    truncated = encoded[:max_codeunits * 2]
-    if len(truncated) % 2 != 0:
-        truncated = truncated[:-1]
-    return truncated.decode('utf-16-le', errors='ignore').strip()
-
-
-# Update jurigged import with proper encoding
-try:
-    import codecs
-    codecs.register_error('strict', codecs.replace_errors)
-    bot.load_extension("interactions.ext.jurigged")
-    print("Live code reloading enabled with jurigged")
-except ImportError:
-    print("Jurigged not available. Install with: pip install jurigged")
-except Exception as e:
-    print(f"Failed to load jurigged extension: {e}")
-
-@slash_command("ask", description="Ask Gemini AI a question")
-@slash_option("prompt", "Your question for Gemini AI", opt_type=interactions.OptionType.STRING, required=True)
-async def ask_command(ctx: interactions.SlashContext, prompt: str):
-    from os import getenv
-    GEMINI_API_KEY = getenv("GEMINI_API_KEY")
-    if not GEMINI_API_KEY:
-        await ctx.send("Gemini API key is not set. Please contact the administrator.", ephemeral=True)
-        return
-    if genai is None:
-        await ctx.send("Gemini API is not installed. Please run 'pip install google-generativeai' and restart the bot.", ephemeral=True)
-        return
-    try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        model_name = "models/gemini-1.5-flash-latest"
-        model = genai.GenerativeModel(model_name)
-        try:
-            response = model.generate_content(prompt)
-        except Exception as e:
-            if "404" in str(e) or "not found" in str(e).lower():
-                await ctx.send(
-                    "The Gemini Flash model is not available or not supported for content generation. Please check your API key and model access, or contact the administrator.",
-                    ephemeral=True
-                )
-                return
-            raise
-        text = response.text.strip() if hasattr(response, 'text') else str(response)
-        if len(text) > 1900:
-            text = text[:1900] + "... (truncated)"
-        await ctx.send(text)
-    except Exception as e:
-        logging.exception(f"Error in /ask command: {e}")
-        await ctx.send(f"An error occurred while processing your request: {e}", ephemeral=True)
-
-
-# --- /petpet command ---
-@slash_command("petpet", description="Give a New World petting ritual to a user!")
-@slash_option(
-    "user",
-    "The user to pet (Aeternum style)",
-    opt_type=interactions.OptionType.USER,
-    required=True,
-)
-async def petpet(ctx: interactions.SlashContext, user: interactions.User):
-    try:
-        await ctx.send(f"✨ {user.mention} receives a magical petpet ritual from the winds of Aeternum! 🐾")
-    except Exception as e:
-        logging.exception(f"Error in petpet command: {e}")
-        await ctx.send("The petpet ritual failed. The winds of Aeternum disrupt the connection. Try again soon!", ephemeral=True)
-
-
-# --- /calculate command ---
-@slash_command("calculate", description="Perform a calculation with New World magic!")
-@slash_option("expression", "The mathematical expression to calculate", opt_type=interactions.OptionType.STRING, required=True)
-async def calculate(ctx: interactions.SlashContext, expression: str):
-    try:
-        # Safe eval for basic math (no builtins)
-        allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("_")}
-        result = eval(expression, {"__builtins__": {}}, allowed_names)
-        await ctx.send(f"🔮 The result of `{expression}` is `{result}`.")
-    except Exception as e:
-        await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
-
-
-@bot.event()
-async def on_disconnect():
-    logging.warning("Bot disconnected. Attempting to reconnect...")
-    # Implement a reconnection strategy here, e.g., wait and then restart the bot
-    await asyncio.sleep(5)  # Wait for 5 seconds before attempting to reconnect
-    logging.info("Attempting to reconnect...")
-    try:
-        bot.start(bot_token)  # Restart the bot (not awaited)
-    except Exception as e:
-        logging.error(f"Failed to reconnect: {e}")
-
-
-@bot.event()
-async def on_message_create(event):
-    # Try to get the message object from different possible attributes
-    message = getattr(event, "message", None) or getattr(event, "data", None)
-    if not message:
-        return
-    author = getattr(message, "author", None)
-    if not author:
-        return
-    is_bot = getattr(author, "bot", None)
-    if is_bot is None and isinstance(author, dict):
-        is_bot = author.get("bot", False)
-    if is_bot:
-        return
-    bot_self = getattr(bot, "me", None) or getattr(bot, "user", None)
-    if not bot_self or not hasattr(bot_self, "id"):
-        return
-    bot_id = str(getattr(bot_self, "id", None))
-    mentions = getattr(message, "mentions", []) or []
-    if not mentions and isinstance(message, dict):
-        mentions = message.get("mentions", [])
-    mentioned_ids = set()
-    for m in mentions:
-        if isinstance(m, dict):
-            mid = m.get("id")
-        else:
-            mid = getattr(m, "id", None)
-        if mid:
-            mentioned_ids.add(str(mid))
-    content = getattr(message, "content", "") or getattr(message, "text", "")
-    logging.debug(f"Message content: {content}")
-    logging.debug(f"Mentions: {mentioned_ids}, Bot ID: {bot_id}")
-    if not mentioned_ids and bot_id and f"<@{bot_id}>" in content:
-        mentioned_ids.add(bot_id)
-    if bot_id in mentioned_ids:
-        reply = "Hello, I am Ina's New World Bot! Type /help for commands."
-        channel = None
-        if hasattr(message, "channel"):
-            channel = getattr(message, "channel", None)
-        elif isinstance(message, dict) and "channel_id" in message:
-            channel_id = message["channel_id"]
-            channel = await bot.fetch_channel(channel_id)
-        # Only call send if channel is not GuildForum or GuildCategory and has send
-        channel_class = type(channel).__name__ if channel else None
-        if channel and hasattr(channel, "send") and callable(getattr(channel, "send", None)) and channel_class not in ("GuildForum", "GuildCategory"):
-            try:
-                await channel.send(reply)
-            except Exception:
-                pass  # Ignore channels that do not support send()
+        logging.error(f"Failed to start the bot: {e}")
