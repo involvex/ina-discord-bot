@@ -11,6 +11,10 @@ import items
 from interactions import Client, slash_command, slash_option, OptionType
 from typing import Optional
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
+from interactions import Activity, ActivityType
+import json
+from bs4 import BeautifulSoup
+import requests
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -30,6 +34,8 @@ if not bot_token:
     sys.exit(1)
 
 bot = Client(token=bot_token)
+
+BUILDS_FILE = 'saved_builds.json'
 
 
 @slash_command("ping", description="Check if the bot is online.")
@@ -176,19 +182,28 @@ async def calculate_craft_autocomplete(ctx):
     await ctx.send(choices=choices)
 
 
-@slash_command("recipe", description="Show the full recipe breakdown for a craftable item.")
+@slash_command("recipe", description="Show the full recipe breakdown for a craftable item and track it.")
 @slash_option("item_name", "The name of the item to show the recipe for", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def recipe(ctx, item_name: str):
+    from recipes import get_recipe, fetch_recipe_from_nwdb, track_recipe
     recipe = get_recipe(item_name)
     if not recipe:
-        await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
-        return
+        # Try to fetch from nwdb.info
+        recipe = fetch_recipe_from_nwdb(item_name)
+        if not recipe:
+            await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
+            return
+        else:
+            await ctx.send(f"Recipe for '{item_name}' fetched from nwdb.info.")
+    # Track the recipe for the user
+    user_id = str(ctx.author.id)
+    track_recipe(user_id, item_name, recipe)
     from interactions import Embed
     embed = Embed()
     embed.title = f"Recipe: {item_name.title()}"
     embed.color = 0x9b59b6
     embed.add_field(name="Station", value=recipe.get("station", "-"), inline=True)
-    embed.add_field(name="Skill", value=f"{recipe.get('skill', '-')}", inline=True)
+    embed.add_field(name="Skill", value=f"{recipe.get('skill', '-')}" , inline=True)
     embed.add_field(name="Skill Level", value=str(recipe.get("skill_level", "-")), inline=True)
     embed.add_field(name="Tier", value=str(recipe.get("tier", "-")), inline=True)
     # Ingredients breakdown
@@ -202,9 +217,81 @@ async def recipe(ctx, item_name: str):
 @recipe.autocomplete("item_name")
 async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    matches = [name for name in RECIPES.keys() if search_term in name]
+    # Load all items from CSV for autocomplete
+    item_data = items.load_items_from_csv('items.csv')
+    if not item_data:
+        await ctx.send(choices=[])
+        return
+    matches = [name for name in item_data.keys() if search_term in name]
     choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
     await ctx.send(choices=choices)
+
+
+@slash_command("addbuild", description="Add a build from nw-buddy.de with a name and optional key perks.")
+@slash_option("link", "The nw-buddy.de build link", opt_type=OptionType.STRING, required=True)
+@slash_option("name", "A name for this build", opt_type=OptionType.STRING, required=True)
+@slash_option("keyperks", "Comma-separated list of key perks (optional, paste from Perk stacks)", opt_type=OptionType.STRING, required=False)
+async def addbuild(ctx, link: str, name: str, keyperks: str = None):
+    import requests
+    from bs4 import BeautifulSoup
+    import re
+    # Validate link
+    if not re.match(r"^https://(www\.)?nw-buddy.de/gearsets/", link):
+        await ctx.send("Please provide a valid nw-buddy.de gearset link.", ephemeral=True)
+        return
+    perks_list = []
+    if keyperks:
+        perks_list = [p.strip() for p in keyperks.split(',') if p.strip()]
+    else:
+        try:
+            resp = requests.get(link, timeout=10)
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                # Look for 'Perk stacks' section
+                perk_header = soup.find(lambda tag: tag.name in ['h2', 'h3', 'h4'] and 'perk stacks' in tag.get_text(strip=True).lower())
+                if perk_header:
+                    # Find the next ul or div after the header
+                    next_elem = perk_header.find_next(['ul', 'div'])
+                    if next_elem:
+                        for li in next_elem.find_all(['li', 'div'], recursive=False):
+                            text = li.get_text(strip=True)
+                            if text:
+                                perks_list.append(text)
+        except Exception:
+            pass
+    # Save build
+    import json
+    BUILDS_FILE = 'saved_builds.json'
+    try:
+        with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
+            builds = json.load(f)
+    except Exception:
+        builds = []
+    builds.append({"name": name, "link": link, "keyperks": perks_list})
+    with open(BUILDS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(builds, f, indent=2)
+    await ctx.send(f"Build '{name}' added!", ephemeral=True)
+
+
+@slash_command("builds", description="Show a list of saved builds.")
+async def builds(ctx):
+    try:
+        with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
+            builds = json.load(f)
+    except Exception:
+        await ctx.send("No builds saved yet.", ephemeral=True)
+        return
+    if not builds:
+        await ctx.send("No builds saved yet.", ephemeral=True)
+        return
+    from interactions import Embed
+    embed = Embed()
+    embed.title = "Saved Builds"
+    embed.color = 0x3498db
+    for build in builds:
+        perks = ', '.join(build.get('keyperks', [])) or '-'
+        embed.add_field(name=build['name'], value=f"[Link]({build['link']})\nKey Perks: {perks}", inline=False)
+    await ctx.send(embeds=embed)
 
 
 # Mention handler
@@ -273,12 +360,10 @@ async def rotate_funny_presence(bot, interval=60):
     while True:
         status = random.choice(NW_FUNNY_STATUSES)
         funny_status = f"{status['name']} – {status['state']}"
-        await bot.change_presence(
-            activity={
-                "name": funny_status,
-                "type": 0  # 0 = Playing
-            }
-        )
+        try:
+            await bot.change_presence(activity=Activity(name=funny_status, type=ActivityType.GAME))
+        except Exception as e:
+            logging.warning(f"Failed to set presence: {e}")
         await asyncio.sleep(interval)
 
 
