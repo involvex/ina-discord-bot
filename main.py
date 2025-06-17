@@ -8,10 +8,9 @@ import math
 import unicodedata
 import re
 import items
-from interactions import Client, slash_command, slash_option, OptionType
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType
 from typing import Optional
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
-from interactions import Activity, ActivityType
 import json
 from bs4 import BeautifulSoup
 import requests
@@ -48,12 +47,18 @@ async def ping(ctx):
 async def help_command(ctx, command: Optional[str] = None):
     commands = {
         "ping": "Check if the bot is online.",
+        "help": "Show all available commands and their descriptions.",
         "petpet": "Give a New World petting ritual to a user!",
         "calculate": "Perform a calculation with New World magic!",
         "nwdb": "Look up items from New World Database.",
+        "calculate_craft": "Calculate all resources needed to craft an item, including intermediates.",
+        "recipe": "Show the full recipe breakdown for a craftable item and track it.",
+        "addbuild": "Add a build from nw-buddy.de with a name and optional key perks.",
+        "builds": "Show a list of saved builds.",
+        "removebuild": "Remove a saved build (requires 'Manage Server' permission)."
     }
     if command and command.lower() in commands:
-        await ctx.send(f"**/{command.lower()}**: {commands[command.lower()]}")
+        await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
     else:
         help_text = "\n".join([f"**/{cmd}**: {desc}" for cmd, desc in commands.items()])
         await ctx.send(f"**Ina's New World Bot Commands:**\n{help_text}")
@@ -100,7 +105,6 @@ async def nwdb(ctx, item_name: str):
     tier = get_any(item, ['tier', 'Tier'], 'Unknown')
     icon_url = get_any(item, ['icon', 'Icon', 'Icon Path', 'icon_url'], None)
     # Build a NWDB-style embed
-    from interactions import Embed
     embed = Embed()
     embed.title = name
     embed.color = 0x9b59b6 if rarity.lower() == 'artifact' else 0x7289da
@@ -198,7 +202,6 @@ async def recipe(ctx, item_name: str):
     # Track the recipe for the user
     user_id = str(ctx.author.id)
     track_recipe(user_id, item_name, recipe)
-    from interactions import Embed
     embed = Embed()
     embed.title = f"Recipe: {item_name.title()}"
     embed.color = 0x9b59b6
@@ -260,8 +263,6 @@ async def addbuild(ctx, link: str, name: str, keyperks: str = None):
         except Exception:
             pass
     # Save build
-    import json
-    BUILDS_FILE = 'saved_builds.json'
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds = json.load(f)
@@ -284,7 +285,6 @@ async def builds(ctx):
     if not builds:
         await ctx.send("No builds saved yet.", ephemeral=True)
         return
-    from interactions import Embed
     embed = Embed()
     embed.title = "Saved Builds"
     embed.color = 0x3498db
@@ -292,6 +292,56 @@ async def builds(ctx):
         perks = ', '.join(build.get('keyperks', [])) or '-'
         embed.add_field(name=build['name'], value=f"[Link]({build['link']})\nKey Perks: {perks}", inline=False)
     await ctx.send(embeds=embed)
+
+
+@slash_command(
+    "removebuild",
+    description="Remove a saved build (requires 'Manage Server' permission).",
+    default_member_permissions=Permissions.MANAGE_GUILD
+)
+@slash_option(
+    "name",
+    description="The name of the build to remove",
+    opt_type=OptionType.STRING,
+    required=True,
+    autocomplete=True
+)
+async def removebuild(ctx, name: str):
+    try:
+        with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
+            builds = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        await ctx.send("No builds saved yet or build file is corrupted.", ephemeral=True)
+        return
+
+    original_length = len(builds)
+    # Find the build by name (case-insensitive)
+    builds_filtered = [b for b in builds if b.get("name", "").lower() != name.lower()]
+
+    if len(builds_filtered) == original_length:
+        await ctx.send(f"Build '{name}' not found.", ephemeral=True)
+        return
+
+    try:
+        with open(BUILDS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(builds_filtered, f, indent=2)
+        await ctx.send(f"Build '{name}' removed successfully.", ephemeral=True)
+    except Exception as e:
+        logging.error(f"Error writing builds file after removing build: {e}")
+        await ctx.send("An error occurred while trying to remove the build.", ephemeral=True)
+
+@removebuild.autocomplete("name")
+async def removebuild_autocomplete(ctx):
+    try:
+        with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
+            builds_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError): # Handle empty or corrupt file
+        await ctx.send(choices=[])
+        return
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    matches = [build.get("name") for build in builds_data if build.get("name") and search_term in build.get("name", "").lower()]
+    choices = [{"name": build_name, "value": build_name} for build_name in list(set(matches))[:25]] # Use set for unique names
+    await ctx.send(choices=choices)
 
 
 # Mention handler
@@ -355,13 +405,21 @@ NW_FUNNY_STATUSES = [
     {"name": "stumme Mitspieler", "state": "Konzentriert oder Bot?"}
 ]
 
+BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8"
+
 async def rotate_funny_presence(bot, interval=60):
     await bot.wait_until_ready()
     while True:
         status = random.choice(NW_FUNNY_STATUSES)
         funny_status = f"{status['name']} – {status['state']}"
+        activity_buttons = [
+            {
+                "label": "Add Ina's Bot to your Server",
+                "url": BOT_INVITE_URL,
+            }
+        ]
         try:
-            await bot.change_presence(activity=Activity(name=funny_status, type=ActivityType.GAME))
+            await bot.change_presence(activity=Activity(name=funny_status, type=ActivityType.GAME, buttons=activity_buttons))
         except Exception as e:
             logging.warning(f"Failed to set presence: {e}")
         await asyncio.sleep(interval)

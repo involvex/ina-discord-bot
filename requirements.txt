@@ -33,3 +33,4 @@ attrs>=22.1
 croniter
 emoji
 tomli
+python-dotenv>=1.0.0

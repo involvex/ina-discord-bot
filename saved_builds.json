@@ -3,5 +3,13 @@
     "name": "VGFS",
     "link": "https://www.nw-buddy.de/gearsets/7lw686oiuad8naek",
     "keyperks": []
+  },
+  {
+    "name": "VG FS",
+    "link": "https://www.nw-buddy.de/gearsets/7lw686oiuad8naek",
+    "keyperks": [
+      "enchanted ward",
+      "scream"
+    ]
   }
 ]
