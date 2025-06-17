@@ -10,7 +10,7 @@ import re
 import items
 from interactions import Client, slash_command, slash_option, OptionType
 from typing import Optional
-from recipes import get_recipe, calculate_crafting_materials
+from recipes import get_recipe, calculate_crafting_materials, RECIPES
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -149,7 +149,7 @@ async def nwdb_autocomplete(ctx):
     await ctx.send(choices=choices)
 
 
-@slash_command("calculate_craft", description="Calculate base resources needed to craft an item.")
+@slash_command("calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
@@ -157,20 +157,50 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
     if not recipe:
         await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
         return
-    base_materials = calculate_crafting_materials(item_name, amount or 1)
-    if not base_materials:
+    # Show all resources, including intermediates
+    all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True)
+    if not all_materials:
         await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
         return
-    lines = [f"To craft {amount or 1} **{item_name.title()}** you need:"]
-    for mat, qty in base_materials.items():
+    lines = [f"To craft {amount or 1} **{item_name.title()}** you need (including intermediates):"]
+    for mat, qty in all_materials.items():
         lines.append(f"• {qty} {mat.title()}")
     await ctx.send("\n".join(lines))
 
 
 @calculate_craft.autocomplete("item_name")
 async def calculate_craft_autocomplete(ctx):
-    # Suggest craftable items from recipes.py
-    from recipes import RECIPES
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    matches = [name for name in RECIPES.keys() if search_term in name]
+    choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
+    await ctx.send(choices=choices)
+
+
+@slash_command("recipe", description="Show the full recipe breakdown for a craftable item.")
+@slash_option("item_name", "The name of the item to show the recipe for", opt_type=OptionType.STRING, required=True, autocomplete=True)
+async def recipe(ctx, item_name: str):
+    recipe = get_recipe(item_name)
+    if not recipe:
+        await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
+        return
+    from interactions import Embed
+    embed = Embed()
+    embed.title = f"Recipe: {item_name.title()}"
+    embed.color = 0x9b59b6
+    embed.add_field(name="Station", value=recipe.get("station", "-"), inline=True)
+    embed.add_field(name="Skill", value=f"{recipe.get('skill', '-')}", inline=True)
+    embed.add_field(name="Skill Level", value=str(recipe.get("skill_level", "-")), inline=True)
+    embed.add_field(name="Tier", value=str(recipe.get("tier", "-")), inline=True)
+    # Ingredients breakdown
+    ing_lines = []
+    for ing in recipe.get("ingredients", []):
+        ing_lines.append(f"• {ing['quantity']} {ing['item']}")
+    embed.add_field(name="Ingredients", value="\n".join(ing_lines) or "-", inline=False)
+    await ctx.send(embeds=embed)
+
+
+@recipe.autocomplete("item_name")
+async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     matches = [name for name in RECIPES.keys() if search_term in name]
     choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
