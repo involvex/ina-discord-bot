@@ -22,7 +22,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.1.6" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.1.7" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
