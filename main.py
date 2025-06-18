@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.100" 
+__version__ = "0.2.101" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -948,24 +948,38 @@ def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
     Example: expr_str = "0.024 * perkMultiplier", gs_multiplier_val = 1.45 (for GS 725 from base 500)
     """
     try:
+        # Original expression for checks, before replacing perkMultiplier
+        original_expr_for_check = expr_str.strip()
+
         # Replace perkMultiplier (and {perkMultiplier} if it appears with braces) with its numeric value
         eval_str = expr_str.replace("{perkMultiplier}", str(gs_multiplier_val)) # Handle if braces are part of the expression
         eval_str = eval_str.replace("perkMultiplier", str(gs_multiplier_val))   # Handle if no braces
 
+        result = None
+        # Check if the original expression was a simple number and did not contain "perkMultiplier"
+        # This means a placeholder like ${10} or ${2.5} is intended to be scaled by gs_multiplier_val.
+        if "perkMultiplier" not in original_expr_for_check:
+            try:
+                # Attempt to convert the original expression to a float
+                numeric_value = float(original_expr_for_check)
+                # If successful, and perkMultiplier was not in the original, scale this number
+                result = numeric_value * gs_multiplier_val
+            except ValueError:
+                # Not a simple number, proceed to eval the expression as is (e.g. if it's a string or complex expression without perkMultiplier)
+                pass # result remains None, will be handled by eval below
 
-        # Define a safe environment for eval
-        allowed_globals = {"__builtins__": {}}
-        allowed_locals = {} # No extra functions needed for simple arithmetic like "2.4 * 1.45"
+        if result is None: # If not a simple number to be scaled, or if conversion failed
+            # Evaluate the expression string (which might have had perkMultiplier substituted)
+            allowed_globals = {"__builtins__": {}}
+            # allowed_locals could include math functions if your expressions need them, e.g., math.floor, etc.
+            # For now, it's kept simple for arithmetic.
+            allowed_locals = {}
+            result = eval(eval_str, allowed_globals, allowed_locals)
 
-        result = eval(eval_str, allowed_globals, allowed_locals)
-
+        # Formatting the result
         if isinstance(result, float):
             if result.is_integer():
-                # If it's a whole number, display as int
                 return str(int(result)) 
-            # For percentages or small numbers, show a few decimal places.
-            # If it's a value like damage, maybe fewer.
-            # Let's try to be smart: if < 1, show more precision.
             num_decimals = 3 if abs(result) < 1 and abs(result) > 0 else 2
             formatted_result = f"{result:.{num_decimals}f}".rstrip('0').rstrip('.')
             return formatted_result if formatted_result != "0" else "0" # Avoid showing just "." if result is 0.0
