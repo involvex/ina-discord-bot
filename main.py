@@ -10,22 +10,24 @@ import platform # For OS detection
 import unicodedata
 import re
 import items
-import perks # Import the new perks module
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File
+import perks
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
+from interactions.models.discord.channel import GuildText, TextChannel # For specific channel type checking
 from typing import Optional
 import packaging.version  # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
-from utils.image_utils import generate_petpet_gif # For petpet command
+from utils.image_utils import generate_petpet_gif
 import json
 from bs4 import BeautifulSoup
 import requests
 
 # Load environment variables from .env file
-#from interactions.models import TextChannel # Adjusted import for TextChannel
 from dotenv import load_dotenv
+import datetime # For timestamps in logs
+
 load_dotenv()
 
-__version__ = "0.2.13" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.17" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -42,6 +44,8 @@ bot = Client(token=bot_token)
 
 BUILDS_FILE = 'saved_builds.json'
 BOT_MANAGERS_FILE = 'bot_managers.json'
+WELCOME_SETTINGS_FILE = 'welcome_settings.json'
+LOGGING_SETTINGS_FILE = 'logging_settings.json'
 OWNER_ID = 157968227106947072 # Your Discord User ID
 
 # --- Update Checker Configuration ---
@@ -50,6 +54,39 @@ GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
 # URL to a file on the main branch containing the version string (e.g., "0.1.1")
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Periodic check interval (e.g., every 6 hours)
+
+# --- Welcome Messages ---
+NEW_WORLD_WELCOME_MESSAGES = [
+    "Welcome to {guild_name}, {member_mention}! Grab your Azoth staff, a new adventure begins!",
+    "A new challenger has arrived in {guild_name}! Welcome, {member_mention}! May your loot be epic.",
+    "By the Spark, {member_mention} has joined us in {guild_name}! Watch out for those turkeys.",
+    "{member_mention} just fast-traveled into {guild_name}! Hope you brought enough repair parts.",
+    "The Corrupted didn't get this one! Welcome to {guild_name}, {member_mention}!",
+    "Fresh off the boat and into {guild_name}! Welcome, {member_mention}. Try not to aggro everything.",
+    "Look out, Aeternum, {member_mention} has arrived in {guild_name}! Let the grind commence.",
+    "Is that a new Syndicate spy, {member_mention}? Or just a friendly adventurer joining {guild_name}? Welcome!",
+    "Welcome, {member_mention}! May your bags be heavy and your Azoth always full here in {guild_name}.",
+    "{member_mention} has breached the gates of {guild_name}! Prepare for glory (and maybe some lag).",
+]
+
+# --- Welcome Message Helper Functions ---
+def load_welcome_settings():
+    """Loads welcome message settings from the JSON file."""
+    try:
+        with open(WELCOME_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+# --- Logging Helper Functions ---
+def load_logging_settings():
+    """Loads server activity logging settings from the JSON file."""
+    try:
+        with open(LOGGING_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
 
 # --- Bot Manager Helper Functions ---
 def load_bot_managers():
@@ -61,9 +98,40 @@ def load_bot_managers():
         return []
 
 def save_bot_managers(managers_list):
-    """Saves bot manager IDs to the JSON file."""
+    """Saves the entire bot managers list to the JSON file."""
     with open(BOT_MANAGERS_FILE, 'w', encoding='utf-8') as f:
         json.dump(managers_list, f, indent=2)
+
+def save_welcome_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
+    """Saves welcome message settings for a specific guild."""
+    settings = load_welcome_settings()
+    settings[str(guild_id)] = {
+        "enabled": enabled,
+        "channel_id": str(channel_id) if channel_id else None
+    }
+    with open(WELCOME_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=4)
+
+def get_welcome_setting(guild_id: str) -> Optional[dict]:
+    """Gets welcome message settings for a specific guild."""
+    settings = load_welcome_settings()
+    return settings.get(str(guild_id))
+
+def save_logging_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
+    """Saves server activity logging settings for a specific guild."""
+    settings = load_logging_settings()
+    settings[str(guild_id)] = {
+        "enabled": enabled,
+        "channel_id": str(channel_id) if channel_id else None
+    }
+    with open(LOGGING_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=4)
+
+def get_logging_setting(guild_id: str) -> Optional[dict]:
+    """Gets server activity logging settings for a specific guild."""
+    settings = load_logging_settings()
+    return settings.get(str(guild_id))
+
 
 def is_bot_manager(user_id: int) -> bool:
     """Checks if a user is the owner or a permitted bot manager."""
@@ -117,8 +185,14 @@ async def help_command(ctx, command: Optional[str] = None):
         "manage update": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
         "manage restart": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
         "settings permit": "Grants a user bot management permissions (Server Administrator or Bot Owner only).",
-        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
-        "settings listmanagers": "Lists users with bot management permissions (Server Administrator only)."
+        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator or Bot Owner only).",
+        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).",
+        "settings welcomemessages enable": "Enables welcome messages in a specific channel (Server Admin or Bot Manager/Owner).",
+        "settings welcomemessages disable": "Disables welcome messages for this server (Server Admin or Bot Manager/Owner).",
+        "settings welcomemessages status": "Shows the current welcome message configuration (Server Admin or Bot Manager/Owner).",
+        "settings logging enable": "Enables server activity logging in a specific channel (Server Admin or Bot Manager/Owner).",
+        "settings logging disable": "Disables server activity logging for this server (Server Admin or Bot Manager/Owner).",
+        "settings logging status": "Shows the current server activity logging configuration (Server Admin or Bot Manager/Owner)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -813,6 +887,131 @@ async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
         embed.add_field(name="Permitted Managers", value="No additional managers permitted.", inline=False)
     await ctx.send(embeds=embed, ephemeral=True)
 
+
+@settings.subcommand_group(name="welcomemessages", description="Manage welcome messages for new members.")
+async def settings_welcomemessages(ctx: SlashContext):
+    """Base for welcome message settings."""
+    pass
+
+@settings_welcomemessages.subcommand(
+    sub_cmd_name="enable",
+    sub_cmd_description="Enables welcome messages in a specific channel."
+)
+@slash_option(
+    "channel",
+    "The text channel where welcome messages should be sent.",
+    opt_type=OptionType.CHANNEL,
+    required=True,
+    channel_types=[ChannelType.GUILD_TEXT] # Restrict to text channels
+)
+async def settings_welcomemessages_enable(ctx: SlashContext, channel: GuildText):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    save_welcome_setting(str(ctx.guild.id), True, str(channel.id))
+    await ctx.send(f"✅ Welcome messages are now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
+
+@settings_welcomemessages.subcommand(
+    sub_cmd_name="disable",
+    sub_cmd_description="Disables welcome messages for this server."
+)
+async def settings_welcomemessages_disable(ctx: SlashContext):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    save_welcome_setting(str(ctx.guild.id), False, None)
+    await ctx.send("✅ Welcome messages are now **disabled** for this server.", ephemeral=True)
+
+@settings_welcomemessages.subcommand(
+    sub_cmd_name="status",
+    sub_cmd_description="Shows the current welcome message configuration."
+)
+async def settings_welcomemessages_status(ctx: SlashContext):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    setting = get_welcome_setting(str(ctx.guild.id))
+    if setting and setting.get("enabled") and setting.get("channel_id"):
+        await ctx.send(f"ℹ️ Welcome messages are **enabled** and set to channel <#{setting['channel_id']}>.", ephemeral=True)
+    else:
+        await ctx.send("ℹ️ Welcome messages are currently **disabled** for this server.", ephemeral=True)
+
+@settings.subcommand_group(name="logging", description="Manage server activity logging.")
+async def settings_logging(ctx: SlashContext):
+    """Base for server activity logging settings."""
+    pass
+
+@settings_logging.subcommand(
+    sub_cmd_name="enable",
+    sub_cmd_description="Enables server activity logging in a specific channel."
+)
+@slash_option(
+    "channel",
+    "The text channel where activity logs should be sent.",
+    opt_type=OptionType.CHANNEL,
+    required=True,
+    channel_types=[ChannelType.GUILD_TEXT]
+)
+async def settings_logging_enable(ctx: SlashContext, channel: GuildText):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    save_logging_setting(str(ctx.guild.id), True, str(channel.id))
+    await ctx.send(f"✅ Server activity logging is now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
+
+@settings_logging.subcommand(
+    sub_cmd_name="disable",
+    sub_cmd_description="Disables server activity logging for this server."
+)
+async def settings_logging_disable(ctx: SlashContext):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    save_logging_setting(str(ctx.guild.id), False, None)
+    await ctx.send("✅ Server activity logging is now **disabled** for this server.", ephemeral=True)
+
+@settings_logging.subcommand(
+    sub_cmd_name="status",
+    sub_cmd_description="Shows the current server activity logging configuration."
+)
+async def settings_logging_status(ctx: SlashContext):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+
+    setting = get_logging_setting(str(ctx.guild.id))
+    if setting and setting.get("enabled") and setting.get("channel_id"):
+        try:
+            log_channel = await bot.fetch_channel(int(setting['channel_id']))
+            await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel {log_channel.mention}.", ephemeral=True)
+        except Exception:
+            await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel ID `{setting['channel_id']}` (channel might be deleted or inaccessible).", ephemeral=True)
+    else:
+        await ctx.send("ℹ️ Server activity logging is currently **disabled** for this server.", ephemeral=True)
+
 SILLY_MENTION_RESPONSES = [
     "Did someone say my name? Or was it just the wind in Aeternum?",
     "You summoned me! What grand adventure awaits? Or do you just need help with `/help`?",
@@ -850,6 +1049,171 @@ async def on_message_create(event):
             # Only send if channel supports send (TextChannel, not GuildForum, GuildCategory, or None)
             if channel and hasattr(channel, 'send') and isinstance(channel, TextChannel): # More robust check
                 await channel.send(random.choice(SILLY_MENTION_RESPONSES))
+
+async def _log_server_activity(guild_id: str, embed: Embed, text_message: Optional[str] = None):
+    """Helper function to send log messages to the configured log channel."""
+    if not guild_id:
+        return
+
+    log_settings = get_logging_setting(str(guild_id))
+    if log_settings and log_settings.get("enabled") and log_settings.get("channel_id"):
+        log_channel_id = log_settings["channel_id"]
+        try:
+            log_channel = await bot.fetch_channel(int(log_channel_id))
+            if log_channel and isinstance(log_channel, TextChannel): # Ensure it's a text channel
+                if not embed.timestamp: # Add timestamp if not already set
+                    embed.timestamp = datetime.datetime.now(datetime.timezone.utc)
+                await log_channel.send(content=text_message, embeds=embed)
+            else:
+                logging.warning(f"Log channel {log_channel_id} in guild {guild_id} is not a valid text channel or not found.")
+        except Permissions.Missing:
+            logging.error(f"Missing permissions to send log message in channel {log_channel_id} for guild {guild_id}.")
+        except Exception as e:
+            logging.error(f"Failed to send log message to channel {log_channel_id} in guild {guild_id}: {e}", exc_info=True)
+
+
+
+@bot.event()
+async def on_guild_member_add(member: Member):
+    """Handles new member joins and sends a welcome message if configured."""
+    if not member.guild:
+        return # Should not happen for this event, but good practice
+
+    guild_id_str = str(member.guild.id)
+    settings = get_welcome_setting(guild_id_str)
+
+    if settings and settings.get("enabled") and settings.get("channel_id"):
+        channel_id = settings["channel_id"]
+        try:
+            # Ensure channel_id is an int for fetch_channel if it expects int
+            channel = await bot.fetch_channel(int(channel_id))
+            if channel and isinstance(channel, TextChannel): # Check if it's a text channel
+                welcome_message = random.choice(NEW_WORLD_WELCOME_MESSAGES).format(
+                    member_mention=member.mention,
+                    guild_name=member.guild.name
+                )
+                await channel.send(welcome_message)
+                logging.info(f"Sent welcome message to {member.username} in guild {member.guild.name} ({guild_id_str}), channel {channel.name} ({channel_id}).")
+            else:
+                logging.warning(f"Welcome message channel {channel_id} in guild {guild_id_str} is not a valid text channel or not found.")
+        except Exception as e:
+            logging.error(f"Failed to send welcome message in guild {guild_id_str}, channel {channel_id}: {e}", exc_info=True)
+
+# --- Server Activity Logging Events ---
+@bot.event()
+async def on_message_delete(message: Message):
+    if not message.guild: # Only log guild messages
+        return
+
+    # Message content might not be available if not cached or intent is missing
+    content = message.content if message.content else "[Content not available or message was an embed]"
+    if len(content) > 1000: # Truncate long messages
+        content = content[:1000] + "..."
+
+    embed = Embed(
+        title="🗑️ Message Deleted",
+        color=0xFF0000, # Red
+        timestamp=datetime.datetime.now(datetime.timezone.utc)
+    )
+    embed.add_field(name="Author", value=f"{message.author.mention} (`{message.author.id}`)", inline=True)
+    embed.add_field(name="Channel", value=message.channel.mention, inline=True)
+    embed.add_field(name="Content", value=f"```{content}```", inline=False)
+    if message.attachments:
+        embed.add_field(name="Attachments", value=f"{len(message.attachments)} attachment(s)", inline=True)
+    embed.set_footer(text=f"Message ID: {message.id}")
+
+    await _log_server_activity(str(message.guild.id), embed)
+
+@bot.event()
+async def on_message_update(before: Message, after: Message):
+    if not after.guild or not after.author or after.author.bot: # Only log guild messages from users
+        return
+    if before and before.content == after.content and not (before.embeds != after.embeds): # Ignore if only embeds changed by bot itself or no actual content change
+        return
+
+    old_content = before.content if before and before.content else "[Content not available or was an embed]"
+    new_content = after.content if after.content else "[Content not available or is an embed]"
+
+    if len(old_content) > 450: old_content = old_content[:450] + "..."
+    if len(new_content) > 450: new_content = new_content[:450] + "..."
+
+    embed = Embed(
+        title="✏️ Message Edited",
+        description=f"Jump to Message",
+        color=0x007FFF, # Blue
+        timestamp=datetime.datetime.now(datetime.timezone.utc)
+    )
+    embed.add_field(name="Author", value=f"{after.author.mention} (`{after.author.id}`)", inline=True)
+    embed.add_field(name="Channel", value=after.channel.mention, inline=True)
+    embed.add_field(name="Before", value=f"```{old_content}```", inline=False)
+    embed.add_field(name="After", value=f"```{new_content}```", inline=False)
+    embed.set_footer(text=f"Message ID: {after.id}")
+
+    await _log_server_activity(str(after.guild.id), embed)
+
+@bot.event()
+async def on_guild_member_remove(member: Member):
+    if not member.guild:
+        return
+
+    embed = Embed(
+        title="🚶 Member Left",
+        description=f"{member.mention} (`{member.username}#{member.discriminator}` | `{member.id}`)",
+        color=0xFFA500, # Orange
+        timestamp=datetime.datetime.now(datetime.timezone.utc)
+    )
+    if member.avatar:
+      embed.set_thumbnail(url=member.avatar.url)
+
+    await _log_server_activity(str(member.guild.id), embed)
+
+@bot.event()
+async def on_guild_ban(guild_id: str, user: User): # Corrected parameters based on common lib patterns
+    guild = await bot.fetch_guild(guild_id) # Fetch guild if only ID is provided
+    if not guild: return
+
+    embed = Embed(
+        title="🔨 Member Banned",
+        description=f"{user.mention} (`{user.username}#{user.discriminator}` | `{user.id}`)",
+        color=0xDC143C, # Crimson
+        timestamp=datetime.datetime.now(datetime.timezone.utc)
+    )
+    if user.avatar:
+        embed.set_thumbnail(url=user.avatar.url)
+    await _log_server_activity(str(guild.id), embed)
+
+@bot.event()
+async def on_guild_unban(guild_id: str, user: User):
+    guild = await bot.fetch_guild(guild_id)
+    if not guild: return
+
+    embed = Embed(
+        title="🤝 Member Unbanned",
+        description=f"{user.mention} (`{user.username}#{user.discriminator}` | `{user.id}`)",
+        color=0x32CD32, # LimeGreen
+        timestamp=datetime.datetime.now(datetime.timezone.utc)
+    )
+    if user.avatar:
+        embed.set_thumbnail(url=user.avatar.url)
+    await _log_server_activity(str(guild.id), embed)
+
+@bot.event()
+async def on_guild_role_create(role: Role):
+    embed = Embed(
+        title="✨ Role Created",
+        description=f"Role: {role.mention} (`{role.name}` | `{role.id}`)",
+        color=0x00FF00, # Green
+    )
+    await _log_server_activity(str(role.guild.id), embed)
+
+@bot.event()
+async def on_guild_role_delete(role: Role): # Assuming role object is passed
+    embed = Embed(
+        title="🗑️ Role Deleted",
+        description=f"Role Name: `{role.name}` (ID: `{role.id}`)",
+        color=0xFF4500, # OrangeRed
+    )
+    await _log_server_activity(str(role.guild.id), embed)
 
 
 # --- New World funny status (RPC) rotation ---
