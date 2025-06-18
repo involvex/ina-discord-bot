@@ -11,7 +11,7 @@ import unicodedata
 import re
 import items
 import perks # Import the new perks module
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, TextChannel
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, TextChannel, SlashContext
 from typing import Optional
 import packaging.version # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
@@ -547,17 +547,12 @@ async def about_command(ctx):
     embed.set_footer(text="Ina's New World Bot is a fan-made project and is not affiliated with Amazon Games or New World.")
     await ctx.send(embeds=embed)
 
-@slash_command(
-    "updatebot",
-    description="Pulls the latest updates from GitHub and prepares the bot for a restart (Owner only)."
-)
-async def update_bot_command(ctx):
-    if ctx.author.id != OWNER_ID:
-        await ctx.send("You do not have permission to use this command.", ephemeral=True)
-        return
-
-    await ctx.defer(ephemeral=True) # Acknowledge interaction, make response visible only to user
-
+async def _perform_update_and_restart(slash_ctx: Optional[SlashContext] = None):
+    """
+    Handles the bot update process: executes the update script and stops the bot for restart.
+    If slash_ctx is provided, sends feedback to the command invoker.
+    Returns True if update script succeeded and bot stop was initiated, False otherwise.
+    """
     # Determine OS and script details
     current_os = platform.system().lower()
     script_name = ""
@@ -580,12 +575,18 @@ async def update_bot_command(ctx):
     script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), script_name))
 
     if not os.path.exists(script_path):
-        logging.error(f"Update script not found at: {script_path}")
-        await ctx.send(f"Error: Update script not found at the expected location: `{script_path}`.", ephemeral=True)
-        return
+        error_msg = f"Update script not found at: {script_path}"
+        logging.error(error_msg)
+        if slash_ctx:
+            await slash_ctx.send(f"Error: Update script not found at the expected location: `{script_path}`.", ephemeral=True)
+        return False
+
+    initiator_desc = "Automatic update check"
+    if slash_ctx and slash_ctx.author:
+        initiator_desc = f"User {slash_ctx.author.username} ({slash_ctx.author.id})"
 
     try:
-        logging.info(f"User {ctx.author.username} ({ctx.author.id}) initiated bot update using {executable} with script: {script_path}")
+        logging.info(f"{initiator_desc} initiated bot update using {executable} with script: {script_path}")
         # Using asyncio.create_subprocess_exec for non-blocking execution
         # Full command: executable *script_args script_path
         process = await asyncio.create_subprocess_exec(
@@ -597,20 +598,57 @@ async def update_bot_command(ctx):
         )
         stdout, stderr = await process.communicate() # Wait for the script to complete
 
-        response_message = f"🚀 **Update Script Execution ({current_os.capitalize()})** 🚀\n"
+        if slash_ctx: # Send detailed feedback if initiated by command
+            response_message = f"🚀 **Update Script Execution ({current_os.capitalize()})** 🚀\n"
+            if process.returncode == 0:
+                response_message += "✅ Script executed successfully.\n"
+            else:
+                response_message += f"⚠️ Script finished with exit code: {process.returncode}.\n"
+            if stdout:
+                response_message += f"**Output:**\n```powershell\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+            if stderr:
+                response_message += f"**Errors:**\n```powershell\n{stderr.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+            
+            if process.returncode == 0:
+                response_message += "\n✅ **Updates pulled. Attempting to apply by restarting the bot...**\n"
+                response_message += "ℹ️ The bot will shut down. An external process manager (e.g., PM2, systemd, Docker restart policy) is required to bring it back online with the updates."
+            else:
+                response_message += "\n❌ **Update script failed. Bot will not restart.**"
+            await slash_ctx.send(response_message, ephemeral=True)
+
         if process.returncode == 0:
-            response_message += "✅ Script executed successfully.\n"
+            logging.info(f"Update script successful for {initiator_desc}. Stopping bot to apply updates.")
+            if slash_ctx: await asyncio.sleep(3) # Ensure message is sent if slash_ctx exists
+            await bot.stop()
+            if not slash_ctx: # Log for automatic update
+                logging.warning(f"Automatic update successful. Bot has been stopped for restart by process manager.")
+            return True
         else:
-            response_message += f"⚠️ Script finished with exit code: {process.returncode}.\n"
-        if stdout:
-            response_message += f"**Output:**\n```powershell\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
-        if stderr:
-            response_message += f"**Errors:**\n```powershell\n{stderr.decode('utf-8', errors='ignore')[:1500]}\n```\n"
-        response_message += "\nℹ️ **Please manually restart the bot process to apply any downloaded updates.**"
-        await ctx.send(response_message, ephemeral=True)
+            log_msg = f"Update script failed for {initiator_desc} with exit code {process.returncode}."
+            if stdout: log_msg += f" Stdout: {stdout.decode(errors='ignore')}"
+            if stderr: log_msg += f" Stderr: {stderr.decode(errors='ignore')}"
+            logging.error(log_msg)
+            if not slash_ctx: # Log for automatic update failure
+                 logging.error(f"Automatic update failed. Script exit code: {process.returncode}.")
+            return False
     except Exception as e:
-        logging.error(f"Error executing update script: {e}", exc_info=True)
-        await ctx.send(f"An error occurred while trying to run the update script '{script_name}': {e}", ephemeral=True)
+        error_msg = f"An error occurred while {initiator_desc} tried to run update script '{script_name}': {e}"
+        logging.error(error_msg, exc_info=True)
+        if slash_ctx:
+            await slash_ctx.send(error_msg, ephemeral=True)
+        return False
+
+@slash_command(
+    "updatebot",
+    description="Pulls the latest updates from GitHub and attempts to restart the bot (Owner only)."
+)
+async def update_bot_command(ctx: SlashContext):
+    if ctx.author.id != OWNER_ID:
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+
+    await ctx.defer(ephemeral=True) # Acknowledge interaction, make response visible only to user
+    await _perform_update_and_restart(slash_ctx=ctx)
 
 @slash_command(
     "restartbot",
@@ -821,8 +859,9 @@ async def check_for_updates():
                     if latest_v > current_v:
                         logging.warning(
                             f"🎉 A new version of Ina's New World Bot is available: {latest_v} "
-                            f"(current: {current_v}). Restart the bot to apply the update. Source: {update_source_url}"
+                            f"(current: {current_v}). Attempting automatic update and restart. Source: {update_source_url}"
                         )
+                        await _perform_update_and_restart() # Automatic update, no context
                     else:
                         logging.info("Bot is up to date with the version on the main branch.")
                 else:
