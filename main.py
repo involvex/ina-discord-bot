@@ -541,9 +541,8 @@ async def update_bot_command(ctx):
         return
 
     # Construct the path to the update script
-    # Assumes main.py is in 'interactions.py' and the script is one level up.
-    # e.g. /home/container/interactions.py/main.py -> /home/container/update_bot.sh
-    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', script_name))
+    # Assumes main.py and the update script are in the same directory (the Git repo root).
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), script_name))
 
     if not os.path.exists(script_path):
         logging.error(f"Update script not found at: {script_path}")

@@ -3,26 +3,24 @@
 # SYNOPSIS
 #     Updates Ina's New World Bot by pulling the latest changes from the GitHub main branch.
 # DESCRIPTION
-#     This script navigates to the bot's directory, fetches and pulls updates from
-#     the 'main' branch of the 'origin' remote. It also provides an option to
-#     update Python dependencies if a requirements.txt file exists.
+#     This script navigates to its own directory (which should be the root of the
+#     Git repository), fetches and pulls updates from the 'main' branch of the
+#     'origin' remote.
 # NOTES
 #     Ensure Git is installed and in your PATH.
 #     Make this script executable: chmod +x update_bot.sh
-
-# --- Configuration ---
-BotDirectory="/home/container/interactions.py" # Your bot's local Git repository path
-GitBranch="main"
-
-# Optional: Path to your Python executable (if not in PATH or for specific venv)
-# PythonExecutable="/path/to/your/python"
-# Optional: Path to your virtual environment's activate script (for pip in venv)
-# VenvActivateScript="/path/to/your/venv/bin/activate"
+#     This script assumes it is located in the root directory of the git repository.
 
 echo "==================================="
 echo "Ina's New World Bot Updater (Linux)"
 echo "==================================="
 echo ""
+
+# --- Configuration ---
+# Determine the directory of this script, which is assumed to be the Git repo root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+BotDirectory="$SCRIPT_DIR"
+GitBranch="main"
 
 # --- Check for Git ---
 if ! command -v git &> /dev/null
@@ -33,15 +31,10 @@ fi
 echo "Git installation found."
 echo ""
 
-# --- Navigate to Bot Directory ---
-echo "Navigating to bot directory: $BotDirectory"
-if [ ! -d "$BotDirectory" ]; then
-    echo "Error: Bot directory not found: $BotDirectory" >&2
-    exit 1
-fi
-
-cd "$BotDirectory" || { echo "Error: Failed to navigate to bot directory: $BotDirectory" >&2; exit 1; }
-echo "Successfully navigated to bot directory: $(pwd)"
+# --- Navigate to Bot Directory (which is the script's directory) ---
+echo "Ensuring execution in bot repository directory: $BotDirectory"
+cd "$BotDirectory" || { echo "Error: Failed to navigate to bot repository directory: $BotDirectory. This script must be run from within the git repository." >&2; exit 1; }
+echo "Successfully operating in bot repository directory: $(pwd)"
 echo ""
 
 # --- Fetch latest changes from all remotes ---
@@ -77,21 +70,6 @@ if [ $? -ne 0 ]; then
 fi
 echo "Successfully pulled latest changes."
 echo ""
-
-# --- (Optional) Update Python Dependencies ---
-# echo "Checking for requirements.txt..."
-# if [ -f "requirements.txt" ]; then
-#     echo "Updating Python dependencies from requirements.txt..."
-#     # If using a specific python executable or virtual environment:
-#     # $PythonExecutable -m pip install -r requirements.txt
-#     # Or if pip is in PATH and for the correct environment:
-#     # pip install -r requirements.txt
-#     # if [ $? -ne 0 ]; then echo "Warning: Failed to update Python dependencies." >&2; fi
-#     echo "Python dependency update step (if implemented) would run here."
-# else
-#     echo "No requirements.txt found, skipping dependency update."
-# fi
-# echo ""
 
 echo "==================================="
 echo "Update Complete!"
