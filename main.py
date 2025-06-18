@@ -12,7 +12,7 @@ import re
 # import items # No longer needed for direct data loading
 # import perks # No longer needed for direct data loading
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
-from interactions.models.discord.channel import GuildText, TextChannel # For specific channel type checking
+from interactions.models.discord.channel import GuildText # For specific channel type checking
 from typing import Optional
 import packaging.version  # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES, track_recipe
@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.58" 
+__version__ = "0.2.59" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
