@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/involvex/ina-discord-bot-">
-    <img src="docs/src/images/logo-minified.svg" alt="Ina's New World Bot Logo" width="150"/>
+    <img src="docs/src/images/logo.png" alt="Ina's New World Bot Logo" width="150"/>
   </a>
 </p>
 
