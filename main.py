@@ -13,7 +13,7 @@ import items
 import perks # Import the new perks module
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File
 from typing import Optional
-import packaging.version # For version comparison
+import packaging.version  # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
 from utils.image_utils import generate_petpet_gif # For petpet command
 import json
@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup
 import requests
 
 # Load environment variables from .env file
+from interactions.models.discord.channel import TextChannel # Added import
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -50,6 +51,45 @@ GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Periodic check interval (e.g., every 6 hours)
 
+# --- Bot Manager Helper Functions ---
+def load_bot_managers():
+    """Loads bot manager IDs from the JSON file."""
+    try:
+        with open(BOT_MANAGERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+def save_bot_managers(managers_list):
+    """Saves bot manager IDs to the JSON file."""
+    with open(BOT_MANAGERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(managers_list, f, indent=2)
+
+def is_bot_manager(user_id: int) -> bool:
+    """Checks if a user is the owner or a permitted bot manager."""
+    if user_id == OWNER_ID:
+        return True
+    managers = load_bot_managers()
+    return user_id in managers
+
+def add_bot_manager(user_id: int) -> bool:
+    """Adds a user to the bot managers list. Returns True if added, False if already present."""
+    managers = load_bot_managers()
+    if user_id not in managers:
+        managers.append(user_id)
+        save_bot_managers(managers)
+        return True
+    return False
+
+def remove_bot_manager(user_id: int) -> bool:
+    """Removes a user from the bot managers list. Returns True if removed, False if not found."""
+    managers = load_bot_managers()
+    if user_id in managers:
+        managers.remove(user_id)
+        save_bot_managers(managers)
+        return True
+    return False
+
 @slash_command("ping", description="Check if the bot is online.")
 async def ping(ctx):
     latency_ms = round(bot.latency * 1000)
@@ -73,7 +113,7 @@ async def help_command(ctx, command: Optional[str] = None):
         "perk": "Look up information about a specific New World perk.",
         "about": "Show information about Ina's New World Bot.",
         "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
-        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission).", # Keep in admin cog
+        "restartbot": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
         "settings permit": "Grants a user bot management permissions (Server Administrator only).",
         "settings unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
         "settings listmanagers": "Lists users with bot management permissions (Server Administrator only)."
@@ -667,13 +707,21 @@ async def update_bot_command(ctx: SlashContext):
 
 @slash_command(
     "restartbot",
-    description="Shuts down the bot. Requires manual process restart. (Manage Server permission needed)",
-    default_member_permissions=Permissions.MANAGE_GUILD
+    description="Shuts down the bot. Requires manual process restart. (Bot Owner/Manager only)"
 )
 async def restart_bot_command(ctx):
-    logging.info(f"Restart command initiated by {ctx.author.username} ({ctx.author.id}) in guild {ctx.guild.name} ({ctx.guild.id}).")
+    if not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+
+    guild_info = "a Direct Message"
+    if ctx.guild:
+        guild_info = f"guild {ctx.guild.name} ({ctx.guild.id})"
+
+    logging.info(f"Restart command initiated by {ctx.author.username} ({ctx.author.id}) in {guild_info}.")
+
     await ctx.send(
-        "✅ Bot shutdown initiated. "
+        "✅ Bot shutdown command acknowledged. "
         "The bot process will now attempt to stop.\n"
         "ℹ️ **A manual restart of the bot's process on the server is required for it to come back online.**",
         ephemeral=True
@@ -682,6 +730,69 @@ async def restart_bot_command(ctx):
     # Note: This stops the Python script. An external process manager (systemd, PM2, Docker, etc.)
     # or a wrapper script is needed to actually restart the bot process.
     await bot.stop()
+
+# --- Settings Commands ---
+settings_cmd = bot.create_group(
+    name="settings",
+    description="Manage bot settings (requires permissions).",
+)
+
+@settings_cmd.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
+@slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
+async def settings_permit(ctx: SlashContext, user: User):
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
+        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+        return
+
+    if add_bot_manager(int(user.id)):
+        await ctx.send(f"✅ {user.mention} has been granted bot management permissions.", ephemeral=True)
+    else:
+        await ctx.send(f"ℹ️ {user.mention} already has bot management permissions.", ephemeral=True)
+
+@settings_cmd.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
+@slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
+async def settings_unpermit(ctx: SlashContext, user: User):
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
+        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+        return
+
+    if int(user.id) == OWNER_ID:
+        await ctx.send("🚫 The bot owner's permissions cannot be revoked.", ephemeral=True)
+        return
+
+    if remove_bot_manager(int(user.id)):
+        await ctx.send(f"✅ {user.mention}'s bot management permissions have been revoked.", ephemeral=True)
+    else:
+        await ctx.send(f"ℹ️ {user.mention} does not have bot management permissions.", ephemeral=True)
+
+@settings_cmd.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
+async def settings_listmanagers(ctx: SlashContext):
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
+        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+        return
+
+    managers = load_bot_managers()
+    embed = Embed(title="👑 Bot Managers 👑", color=0xFFD700) # Gold color
+
+    owner_user = await bot.fetch_user(OWNER_ID)
+    if owner_user:
+        embed.add_field(name="Bot Owner (Implicit Manager)", value=owner_user.mention, inline=False)
+    else:
+        embed.add_field(name="Bot Owner (Implicit Manager)", value=f"ID: {OWNER_ID} (User not found)", inline=False)
+
+    if managers:
+        manager_mentions = []
+        for manager_id in managers:
+            if manager_id == OWNER_ID: continue # Skip owner if already listed
+            try:
+                user = await bot.fetch_user(manager_id)
+                manager_mentions.append(user.mention if user else f"ID: {manager_id} (User not found)")
+            except Exception:
+                manager_mentions.append(f"ID: {manager_id} (Error fetching user)")
+        embed.add_field(name="Permitted Managers", value="\n".join(manager_mentions) if manager_mentions else "No additional managers permitted.", inline=False)
+    else:
+        embed.add_field(name="Permitted Managers", value="No additional managers permitted.", inline=False)
+    await ctx.send(embeds=embed, ephemeral=True)
 
 SILLY_MENTION_RESPONSES = [
     "Did someone say my name? Or was it just the wind in Aeternum?",
