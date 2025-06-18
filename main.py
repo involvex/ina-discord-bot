@@ -18,6 +18,7 @@ from recipes import get_recipe, calculate_crafting_materials, RECIPES
 import json
 from bs4 import BeautifulSoup
 import requests
+from interactions.models import TextChannel # Import TextChannel here
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -843,9 +844,7 @@ async def check_for_updates():
 
 @bot.event()
 async def on_ready():
-    # Need to import TextChannel for the isinstance check in on_message_create
-    global TextChannel
-    from interactions import TextChannel
+
 
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
     asyncio.create_task(check_for_updates())
