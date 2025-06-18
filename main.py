@@ -21,11 +21,11 @@ from bs4 import BeautifulSoup
 import requests
 
 # Load environment variables from .env file
-from interactions.models import TextChannel # Adjusted import for TextChannel
+#from interactions.models import TextChannel # Adjusted import for TextChannel
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.2.7" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.8" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
