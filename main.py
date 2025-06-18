@@ -11,6 +11,7 @@ import items
 import perks # Import the new perks module
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType
 from typing import Optional
+import packaging.version # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
 import json
 from bs4 import BeautifulSoup
@@ -19,6 +20,8 @@ import requests
 # Load environment variables from .env file
 from dotenv import load_dotenv
 load_dotenv()
+
+__version__ = "0.1.0" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,6 +39,12 @@ if not bot_token:
 bot = Client(token=bot_token)
 
 BUILDS_FILE = 'saved_builds.json'
+
+# --- Update Checker Configuration ---
+GITHUB_REPO_OWNER = "involvex"
+GITHUB_REPO_NAME = "ina-discord-bot"
+GITHUB_API_LATEST_RELEASE_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
+UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Check every 6 hours
 
 
 @slash_command("ping", description="Check if the bot is online.")
@@ -576,10 +585,60 @@ async def rotate_funny_presence(bot, interval=60):
         await asyncio.sleep(interval)
 
 
+async def check_for_updates():
+    """Periodically checks GitHub for new bot releases."""
+    await bot.wait_until_ready()
+    logging.info(f"Ina's New World Bot version: {__version__} starting update checks.")
+    while True:
+        try:
+            headers = {
+                "Accept": "application/vnd.github.v3+json",
+                # "User-Agent": "InaDiscordBotUpdateChecker/1.0" # Optional: Good practice for API requests
+            }
+            response = requests.get(GITHUB_API_LATEST_RELEASE_URL, headers=headers, timeout=15)
+
+            if response.status_code == 404:
+                logging.info(f"No releases found on GitHub repository ({GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}) for update check.")
+            elif response.status_code == 200:
+                latest_release_data = response.json()
+                latest_version_str = latest_release_data.get("tag_name")
+                release_url = latest_release_data.get("html_url")
+
+                if latest_version_str:
+                    current_v = packaging.version.parse(__version__)
+                    latest_v = packaging.version.parse(latest_version_str) # Handles "v1.0.0" or "1.0.0"
+
+                    logging.debug(f"Update Check: Current bot version: {current_v}, Latest GitHub release: {latest_v}")
+
+                    if latest_v > current_v:
+                        logging.warning(
+                            f"🎉 A new version of Ina's New World Bot is available: {latest_v} "
+                            f"(current: {current_v}). Download from: {release_url}"
+                        )
+                        # You could add a Discord message notification here if desired
+                        # e.g., send to a specific channel or bot owner
+                    else:
+                        logging.info("Bot is up to date with the latest GitHub release.")
+                else:
+                    logging.warning("Could not find 'tag_name' in the latest GitHub release data.")
+            else:
+                logging.error(
+                    f"Failed to fetch latest release info from GitHub. Status: {response.status_code}, "
+                    f"Response: {response.text[:200]}"
+                )
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Network error during GitHub update check: {e}")
+        except packaging.version.InvalidVersion as e:
+            logging.error(f"Error parsing version string during update check: {e}")
+        except Exception as e:
+            logging.error(f"An unexpected error occurred during GitHub update check: {e}", exc_info=True)
+        
+        await asyncio.sleep(UPDATE_CHECK_INTERVAL_SECONDS)
+
 @bot.event()
 async def on_ready():
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
-
+    asyncio.create_task(check_for_updates())
 
 if __name__ == "__main__":
     try:

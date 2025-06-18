@@ -34,3 +34,4 @@ croniter
 emoji
 tomli
 python-dotenv>=1.0.0
+packaging>=23.0
