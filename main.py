@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.60" 
+__version__ = "0.2.61" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -797,7 +797,7 @@ async def perk_command(ctx, perk_name: str):
 
     # Use sanitized key names based on create_db.py logic
     name = get_any_perk_info(perk_info, ['Name', 'PerkName'], perk_name) # 'Name' or 'PerkName'
-    description = get_any_perk_info(perk_info, ['Description', 'Desc'], 'No description available.')
+    description = get_any_perk_info(perk_info, ['Description', 'Desc', 'description', 'DescText', 'EffectText'], 'No description available.') # Added more potential keys
     perk_type = get_any_perk_info(perk_info, ['Type', 'PerkType', 'Category'], 'Unknown Type') # 'PerkType'
     icon_url = get_any_perk_info(perk_info, ['Icon', 'IconPath', 'icon_url'], None) # 'IconPath' or 'icon_url' from scrape_perks
     perk_id = get_any_perk_info(perk_info, ['PerkID', 'ID', 'id'], None) # 'PerkID' or 'id' from scrape_perks
