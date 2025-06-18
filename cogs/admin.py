@@ -28,17 +28,42 @@ async def update_bot_command(ctx):
 
     try:
         logging.info(f"User {ctx.author.user.username} initiated bot update using: {executable} {script_path}")
+        # In interactions.py v5+, ctx.author is the User/Member object, so ctx.author.username is correct.
+        # logging.info(f"User {ctx.author.username} ({ctx.author.id}) initiated bot update using: {executable} {script_path}")
+
         process = await asyncio.create_subprocess_exec(
             executable, *script_args, script_path,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate()
+
+        stdout_str = stdout.decode('utf-8', errors='ignore')
+        stderr_str = stderr.decode('utf-8', errors='ignore')
+
         response_message = f"🚀 **Update Script Execution ({current_os.capitalize()})** 🚀\n"
         response_message += f"✅ Script executed successfully.\n" if process.returncode == 0 else f"⚠️ Script finished with exit code: {process.returncode}.\n"
-        if stdout: response_message += f"**Output:**\n```\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
-        if stderr: response_message += f"**Errors:**\n```\n{stderr.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+
+        # Max length for combined log sections to fit within Discord's 2000 char limit
+        # Boilerplate text is roughly 200-250 chars. Remaining: ~1750. For two sections: ~875 each.
+        max_log_section_length = 850
+
+        if stdout_str:
+            response_message += f"**Output:**\n```\n{stdout_str[:max_log_section_length]}\n```\n"
+            if len(stdout_str) > max_log_section_length:
+                response_message += "... (output truncated)\n"
+        if stderr_str:
+            response_message += f"**Errors:**\n```\n{stderr_str[:max_log_section_length]}\n```\n"
+            if len(stderr_str) > max_log_section_length:
+                response_message += "... (errors truncated)\n"
+
         response_message += "\nℹ️ **Please manually restart the bot process to apply any downloaded updates.**"
+
+        if len(response_message) > 2000:
+            response_message = (f"🚀 Update script finished with exit code: {process.returncode}. "
+                                f"Logs were too long to display here. Please check the console/logs. "
+                                "Manually restart the bot to apply updates.")
         await ctx.send(response_message, ephemeral=True)
+
     except Exception as e:
         logging.error(f"Error executing update script: {e}", exc_info=True)
         await ctx.send(f"An error occurred: {e}", ephemeral=True)

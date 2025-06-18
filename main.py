@@ -595,22 +595,40 @@ async def _perform_update_and_restart(slash_ctx: Optional[SlashContext] = None):
         )
         stdout, stderr = await process.communicate() # Wait for the script to complete
 
+        stdout_str = stdout.decode('utf-8', errors='ignore')
+        stderr_str = stderr.decode('utf-8', errors='ignore')
+
         if slash_ctx: # Send detailed feedback if initiated by command
             response_message = f"🚀 **Update Script Execution ({current_os.capitalize()})** 🚀\n"
             if process.returncode == 0:
                 response_message += "✅ Script executed successfully.\n"
             else:
                 response_message += f"⚠️ Script finished with exit code: {process.returncode}.\n"
-            if stdout:
-                response_message += f"**Output:**\n```powershell\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
-            if stderr:
-                response_message += f"**Errors:**\n```powershell\n{stderr.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+            
+            max_log_section_length = 850 # Max length for each log section
+
+            if stdout_str:
+                response_message += f"**Output:**\n```\n{stdout_str[:max_log_section_length]}\n```\n" # Using generic ```
+                if len(stdout_str) > max_log_section_length:
+                    response_message += f"... (output truncated)\n"
+            if stderr_str:
+                response_message += f"**Errors:**\n```\n{stderr_str[:max_log_section_length]}\n```\n" # Using generic ```
+                if len(stderr_str) > max_log_section_length:
+                    response_message += f"... (errors truncated)\n"
             
             if process.returncode == 0:
                 response_message += "\n✅ **Updates pulled. Attempting to apply by restarting the bot...**\n"
                 response_message += "ℹ️ The bot will shut down. An external process manager (e.g., PM2, systemd, Docker restart policy) is required to bring it back online with the updates."
             else:
                 response_message += "\n❌ **Update script failed. Bot will not restart.**"
+
+            if len(response_message) > 2000:
+                response_message = (f"🚀 Update script finished with exit code: {process.returncode}. "
+                                    f"Logs were too long to display here. Please check the console/logs. ")
+                if process.returncode == 0:
+                    response_message += "Bot will attempt to restart to apply updates."
+                else:
+                    response_message += "Bot will not restart."
             await slash_ctx.send(response_message, ephemeral=True)
 
         if process.returncode == 0:
