@@ -43,7 +43,8 @@ BUILDS_FILE = 'saved_builds.json'
 # --- Update Checker Configuration ---
 GITHUB_REPO_OWNER = "involvex"
 GITHUB_REPO_NAME = "ina-discord-bot"
-GITHUB_API_LATEST_RELEASE_URL = f"https://api.github.com/repos/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/releases/latest"
+# URL to a file on the main branch containing the version string (e.g., "0.1.1")
+GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Check every 6 hours
 
 
@@ -595,32 +596,33 @@ async def check_for_updates():
                 "Accept": "application/vnd.github.v3+json",
                 # "User-Agent": "InaDiscordBotUpdateChecker/1.0" # Optional: Good practice for API requests
             }
-            response = requests.get(GITHUB_API_LATEST_RELEASE_URL, headers=headers, timeout=15)
+            # Fetch the VERSION file from the main branch
+            response = requests.get(GITHUB_VERSION_FILE_URL, headers=headers, timeout=15) # headers might not be strictly needed for raw.githubusercontent
 
             if response.status_code == 404:
-                logging.info(f"No releases found on GitHub repository ({GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}) for update check.")
+                logging.info(f"VERSION file not found on main branch at {GITHUB_VERSION_FILE_URL}. Update check skipped.")
             elif response.status_code == 200:
-                latest_release_data = response.json()
-                latest_version_str = latest_release_data.get("tag_name")
-                release_url = latest_release_data.get("html_url")
+                latest_version_str = response.text.strip() # The content of the VERSION file
+                # Link to the main branch for update instructions/source
+                update_source_url = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/tree/main"
 
                 if latest_version_str:
                     current_v = packaging.version.parse(__version__)
-                    latest_v = packaging.version.parse(latest_version_str) # Handles "v1.0.0" or "1.0.0"
+                    latest_v = packaging.version.parse(latest_version_str)
 
-                    logging.debug(f"Update Check: Current bot version: {current_v}, Latest GitHub release: {latest_v}")
+                    logging.debug(f"Update Check: Current bot version: {current_v}, Latest version on main branch: {latest_v}")
 
                     if latest_v > current_v:
                         logging.warning(
                             f"🎉 A new version of Ina's New World Bot is available: {latest_v} "
-                            f"(current: {current_v}). Download from: {release_url}"
+                            f"(current: {current_v}). Check the main branch: {update_source_url}"
                         )
                         # You could add a Discord message notification here if desired
                         # e.g., send to a specific channel or bot owner
                     else:
-                        logging.info("Bot is up to date with the latest GitHub release.")
+                        logging.info("Bot is up to date with the version on the main branch.")
                 else:
-                    logging.warning("Could not find 'tag_name' in the latest GitHub release data.")
+                    logging.warning(f"VERSION file at {GITHUB_VERSION_FILE_URL} is empty or invalid.")
             else:
                 logging.error(
                     f"Failed to fetch latest release info from GitHub. Status: {response.status_code}, "
