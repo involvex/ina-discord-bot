@@ -17,8 +17,8 @@ def sanitize_json_description(description_text):
     if not description_text:
         return "No description available."
 
-    # Replace placeholders like ${value} with value
-    description_text = re.sub(r'\$\{\s*(\d+(\.\d+)?)\s*\}', r'\1', description_text)
+    # REMOVED: Premature replacement of numeric placeholders.
+    # description_text = re.sub(r'\$\{\s*(\d+(\.\d+)?)\s*\}', r'\1', description_text)
 
     # Replace multiple spaces/newlines with a single space or newline, but preserve intentional newlines from <br>
     description_text = description_text.replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
