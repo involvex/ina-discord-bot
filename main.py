@@ -5,6 +5,7 @@ import logging
 import asyncio
 import uuid
 import math
+import subprocess
 import unicodedata
 import re
 import items
@@ -21,15 +22,13 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.1.2" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.1.3" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logging.getLogger("interactions").setLevel(logging.DEBUG)
-
-DEBUG = True
 
 bot_token = os.getenv("BOT_TOKEN")
 if not bot_token:
@@ -45,7 +44,7 @@ GITHUB_REPO_OWNER = "involvex"
 GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
 # URL to a file on the main branch containing the version string (e.g., "0.1.1")
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
-UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Check every 6 hours
+UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Periodic check interval (e.g., every 6 hours)
 
 
 @slash_command("ping", description="Check if the bot is online.")
@@ -587,7 +586,7 @@ async def rotate_funny_presence(bot, interval=60):
 
 
 async def check_for_updates():
-    """Periodically checks GitHub for new bot releases."""
+    """Periodically checks GitHub for new bot releases and logs a notification if found."""
     await bot.wait_until_ready()
     logging.info(f"Ina's New World Bot version: {__version__} starting update checks.")
     while True:
@@ -615,10 +614,8 @@ async def check_for_updates():
                     if latest_v > current_v:
                         logging.warning(
                             f"🎉 A new version of Ina's New World Bot is available: {latest_v} "
-                            f"(current: {current_v}). Check the main branch: {update_source_url}"
+                            f"(current: {current_v}). Restart the bot to apply the update. Source: {update_source_url}"
                         )
-                        # You could add a Discord message notification here if desired
-                        # e.g., send to a specific channel or bot owner
                     else:
                         logging.info("Bot is up to date with the version on the main branch.")
                 else:
