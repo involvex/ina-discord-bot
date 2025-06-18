@@ -491,9 +491,14 @@ async def about_command(ctx):
         color=0x7289DA  # Discord Blurple
     )
     embed.add_field(
+        name="Version",
+        value=f"`{__version__}`",
+        inline=True
+    )
+    embed.add_field(
         name="Creator",
         value="This bot was lovingly crafted by <@157968227106947072>.",
-        inline=False
+        inline=True # Changed to true to align better with version
     )
     embed.add_field(
         name="Credits & Data Sources",
