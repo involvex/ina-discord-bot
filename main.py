@@ -23,7 +23,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.1.7" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.1.8" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -70,7 +70,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
         "perk": "Look up information about a specific New World perk.",
         "about": "Show information about Ina's New World Bot.",
-        "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>)."
+        "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
+        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -576,6 +577,24 @@ async def update_bot_command(ctx):
     except Exception as e:
         logging.error(f"Error executing update script: {e}", exc_info=True)
         await ctx.send(f"An error occurred while trying to run the update script '{script_name}': {e}", ephemeral=True)
+
+@slash_command(
+    "restartbot",
+    description="Shuts down the bot. Requires manual process restart. (Manage Server permission needed)",
+    default_member_permissions=Permissions.MANAGE_GUILD
+)
+async def restart_bot_command(ctx):
+    logging.info(f"Restart command initiated by {ctx.author.user.username} ({ctx.author.id}) in guild {ctx.guild.name} ({ctx.guild.id}).")
+    await ctx.send(
+        "✅ Bot shutdown initiated. "
+        "The bot process will now attempt to stop.\n"
+        "ℹ️ **A manual restart of the bot's process on the server is required for it to come back online.**",
+        ephemeral=True
+    )
+    # Gracefully stop the bot
+    # Note: This stops the Python script. An external process manager (systemd, PM2, Docker, etc.)
+    # or a wrapper script is needed to actually restart the bot process.
+    await bot.stop()
 
 # Mention handler
 @bot.event()
