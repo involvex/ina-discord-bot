@@ -39,7 +39,7 @@ echo ""
 
 # --- Fetch latest changes from all remotes ---
 echo "Fetching latest updates from remote repository..."
-git fetch --all --progress
+git fetch --all --progress -f
 if [ $? -ne 0 ]; then
     echo "Error: Git fetch failed. Check your internet connection and Git configuration." >&2
     exit 1
