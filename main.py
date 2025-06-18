@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.25" 
+__version__ = "0.2.27" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -193,14 +193,14 @@ async def help_command(ctx, command: Optional[str] = None):
         "manage update": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
         "manage restart": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
         "settings permit": "Grants a user bot management permissions (Server Administrator or Bot Owner only).",
-        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator or Bot Owner only).",
-        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).",
-        "settings welcomemessages enable": "Enables welcome messages in a specific channel (Server Admin or Bot Manager/Owner).",
-        "settings welcomemessages disable": "Disables welcome messages for this server (Server Admin or Bot Manager/Owner).",
-        "settings welcomemessages status": "Shows the current welcome message configuration (Server Admin or Bot Manager/Owner).",
-        "settings logging enable": "Enables server activity logging in a specific channel (Server Admin or Bot Manager/Owner).",
-        "settings logging disable": "Disables server activity logging for this server (Server Admin or Bot Manager/Owner).",
-        "settings logging status": "Shows the current server activity logging configuration (Server Admin or Bot Manager/Owner)."
+        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator or Bot Owner only).", # Keep
+        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).", # Keep
+        "settings welcomemessages enable_welcome": "Enables welcome messages in a specific channel (Server Admin or Bot Manager/Owner).",
+        "settings welcomemessages disable_welcome": "Disables welcome messages for this server (Server Admin or Bot Manager/Owner).",
+        "settings welcomemessages welcome_status": "Shows the current welcome message configuration (Server Admin or Bot Manager/Owner).",
+        "settings logging enable_logging": "Enables server activity logging in a specific channel (Server Admin or Bot Manager/Owner).",
+        "settings logging disable_logging": "Disables server activity logging for this server (Server Admin or Bot Manager/Owner).",
+        "settings logging logging_status": "Shows the current server activity logging configuration (Server Admin or Bot Manager/Owner)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -903,7 +903,7 @@ async def settings_welcomemessages_group(ctx: SlashContext): # Renamed function 
     pass
 
 @settings_welcomemessages_group.subcommand(
-    sub_cmd_name="enable",
+    sub_cmd_name="enable_welcome",
     sub_cmd_description="Enables welcome messages in a specific channel."
 )
 @slash_option(
@@ -925,7 +925,7 @@ async def settings_welcomemessages_enable(ctx: SlashContext, channel: GuildText)
     await ctx.send(f"✅ Welcome messages are now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
 
 @settings_welcomemessages_group.subcommand(
-    sub_cmd_name="disable",
+    sub_cmd_name="disable_welcome",
     sub_cmd_description="Disables welcome messages for this server."
 )
 async def settings_welcomemessages_disable(ctx: SlashContext):
@@ -940,7 +940,7 @@ async def settings_welcomemessages_disable(ctx: SlashContext):
     await ctx.send("✅ Welcome messages are now **disabled** for this server.", ephemeral=True)
 
 @settings_welcomemessages_group.subcommand(
-    sub_cmd_name="status",
+    sub_cmd_name="welcome_status",
     sub_cmd_description="Shows the current welcome message configuration."
 )
 async def settings_welcomemessages_status(ctx: SlashContext):
@@ -964,7 +964,7 @@ async def settings_logging_group(ctx: SlashContext): # Renamed function to indic
     pass
 
 @settings_logging_group.subcommand(
-    sub_cmd_name="enable",
+    sub_cmd_name="enable_logging",
     sub_cmd_description="Enables server activity logging in a specific channel."
 )
 @slash_option(
@@ -986,7 +986,7 @@ async def settings_logging_enable(ctx: SlashContext, channel: GuildText): # Type
     await ctx.send(f"✅ Server activity logging is now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
 
 @settings_logging_group.subcommand(
-    sub_cmd_name="disable",
+    sub_cmd_name="disable_logging",
     sub_cmd_description="Disables server activity logging for this server."
 )
 async def settings_logging_disable(ctx: SlashContext):
@@ -1001,7 +1001,7 @@ async def settings_logging_disable(ctx: SlashContext):
     await ctx.send("✅ Server activity logging is now **disabled** for this server.", ephemeral=True)
 
 @settings_logging_group.subcommand(
-    sub_cmd_name="status",
+    sub_cmd_name="logging_status",
     sub_cmd_description="Shows the current server activity logging configuration."
 )
 async def settings_logging_status(ctx: SlashContext):
