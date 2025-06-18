@@ -76,7 +76,7 @@ For automatic updates, ensure `update_bot.ps1` (Windows) or `update_bot.sh` (Lin
 ## Important Links
 
 *   View on GitHub
-*   Project Documentation
+*   [Project Documentation](https://your-documentation-url-here) <!-- Or remove if README is the main doc -->
 *   Official New World Site
 
 ---
@@ -84,4 +84,3 @@ For automatic updates, ensure `update_bot.ps1` (Windows) or `update_bot.sh` (Lin
 <p align="center">
   <small>Crafted with Azoth for the New World community &copy; 2025. Ina's Bot is a fan project and not affiliated with Amazon Games.</small>
 </p>
-

@@ -20,6 +20,53 @@ from utils.image_utils import generate_petpet_gif
 import json
 from bs4 import BeautifulSoup
 import requests
+# In your main.py or a data_manager.py
+import sqlite3
+import os
+
+DB_NAME = "new_world_data.db" # Path to your SQLite DB
+
+def get_db_connection():
+    # Check if DB exists, if not, try to create it by calling populate_db()
+    # This is a simplified check; you might want more robust logic
+    if not os.path.exists(DB_NAME):
+        print(f"Database {DB_NAME} not found. Please run create_db.py first or integrate its logic.")
+        # You could attempt to run the population logic here if appropriate
+        # from create_db import populate_db
+        # populate_db() # This might be too slow/memory intensive for startup
+
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row # To access columns by name
+    return conn
+
+async def find_item_in_db(item_name_query: str):
+    # Ensure DB exists before trying to connect
+    if not os.path.exists(DB_NAME):
+        return None # Or an error message
+
+    conn = get_db_connection()
+    results = []
+    try:
+        cursor = conn.cursor()
+        # Adjust table and column names based on your CSV and create_db.py script
+        # Example: Searching for an item by name in the 'items' table
+        # Ensure the column name 'name' matches what's in your CSV/DB
+        cursor.execute("SELECT * FROM items WHERE name LIKE ?", ('%' + item_name_query + '%',))
+        items = cursor.fetchall()
+        results = [dict(row) for row in items]
+    except sqlite3.Error as e:
+        print(f"SQLite error: {e}")
+        # Handle specific errors, e.g., table not found if DB isn't populated
+        if "no such table" in str(e):
+             print(f"Table not found. The database '{DB_NAME}' might be empty or not correctly populated.")
+        return None # Indicate error or no data
+    finally:
+        if conn:
+            conn.close()
+    return results
+
+# Your command would then call find_item_in_db(item_name)
+
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -27,7 +74,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.48" 
+__version__ = "0.2.49" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
