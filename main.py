@@ -25,7 +25,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.2.11" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.13" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -108,13 +108,15 @@ async def help_command(ctx, command: Optional[str] = None):
         "calculate_craft": "Calculate all resources needed to craft an item, including intermediates.",
         "recipe": "Show the full recipe breakdown for a craftable item and track it.",
         "addbuild": "Add a build from nw-buddy.de with a name and optional key perks.",
-        "builds": "Show a list of saved builds.",
+        "build list": "Show a list of saved builds.",
+        "build add": "Add a build from nw-buddy.de with a name and optional key perks.",
+        "build remove": "Remove a saved build (requires 'Manage Server' permission).",
         "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
         "perk": "Look up information about a specific New World perk.",
         "about": "Show information about Ina's New World Bot.",
-        "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
-        "restartbot": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
-        "settings permit": "Grants a user bot management permissions (Server Administrator only).",
+        "manage update": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
+        "manage restart": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
+        "settings permit": "Grants a user bot management permissions (Server Administrator or Bot Owner only).",
         "settings unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
         "settings listmanagers": "Lists users with bot management permissions (Server Administrator only)."
     }
@@ -306,12 +308,17 @@ async def recipe_autocomplete(ctx):
     choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
     await ctx.send(choices=choices)
 
+# --- Build Management Commands ---
+@slash_command(name="build", description="Manage saved New World builds.")
+async def build_group(ctx: SlashContext):
+    """Base command for build management."""
+    pass
 
-@slash_command("addbuild", description="Add a build from nw-buddy.de with a name and optional key perks.")
+@build_group.subcommand(sub_cmd_name="add", sub_cmd_description="Add a build from nw-buddy.de.")
 @slash_option("link", "The nw-buddy.de build link", opt_type=OptionType.STRING, required=True)
 @slash_option("name", "A name for this build", opt_type=OptionType.STRING, required=True)
 @slash_option("keyperks", "Comma-separated list of key perks (optional, paste from Perk stacks)", opt_type=OptionType.STRING, required=False)
-async def addbuild(ctx, link: str, name: str, keyperks: str = None):
+async def build_add(ctx: SlashContext, link: str, name: str, keyperks: str = None):
     import requests
     from bs4 import BeautifulSoup
     import re
@@ -351,8 +358,8 @@ async def addbuild(ctx, link: str, name: str, keyperks: str = None):
     await ctx.send(f"Build '{name}' added!", ephemeral=True)
 
 
-@slash_command("builds", description="Show a list of saved builds.")
-async def builds(ctx):
+@build_group.subcommand(sub_cmd_name="list", sub_cmd_description="Show a list of saved builds.")
+async def build_list(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds = json.load(f)
@@ -379,10 +386,9 @@ async def builds(ctx):
     await ctx.send(embeds=embed)
 
 
-@slash_command(
-    "removebuild",
-    description="Remove a saved build (requires 'Manage Server' permission).",
-    default_member_permissions=Permissions.MANAGE_GUILD
+@build_group.subcommand(
+    sub_cmd_name="remove",
+    sub_cmd_description="Remove a saved build (requires 'Manage Server' permission)."
 )
 @slash_option(
     "name",
@@ -391,7 +397,12 @@ async def builds(ctx):
     required=True,
     autocomplete=True
 )
-async def removebuild(ctx, name: str):
+async def build_remove(ctx: SlashContext, name: str):
+    # Check for 'Manage Server' permission or if the user is a bot manager/owner
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager to use this command.", ephemeral=True)
+        return
+
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds = json.load(f)
@@ -415,8 +426,8 @@ async def removebuild(ctx, name: str):
         logging.error(f"Error writing builds file after removing build: {e}")
         await ctx.send("An error occurred while trying to remove the build.", ephemeral=True)
 
-@removebuild.autocomplete("name")
-async def removebuild_autocomplete(ctx):
+@build_remove.autocomplete("name")
+async def build_remove_autocomplete(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds_data = json.load(f)
@@ -693,11 +704,17 @@ async def _perform_update_and_restart(slash_ctx: Optional[SlashContext] = None):
             await slash_ctx.send(error_msg, ephemeral=True)
         return False
 
-@slash_command(
-    "updatebot",
-    description="Pulls the latest updates from GitHub and attempts to restart the bot (Owner only)."
+# --- Bot Management Commands ---
+@slash_command(name="manage", description="Manage bot operations (restricted).")
+async def manage_group(ctx: SlashContext):
+    """Base command for bot management."""
+    pass
+
+@manage_group.subcommand(
+    sub_cmd_name="update",
+    sub_cmd_description="Pulls updates from GitHub and restarts the bot (Owner only)."
 )
-async def update_bot_command(ctx: SlashContext):
+async def manage_update(ctx: SlashContext):
     if ctx.author.id != OWNER_ID:
         await ctx.send("You do not have permission to use this command.", ephemeral=True)
         return
@@ -705,12 +722,12 @@ async def update_bot_command(ctx: SlashContext):
     await ctx.defer(ephemeral=True) # Acknowledge interaction, make response visible only to user
     await _perform_update_and_restart(slash_ctx=ctx)
 
-@slash_command(
-    "restartbot",
-    description="Shuts down the bot. Requires manual process restart. (Bot Owner/Manager only)"
+@manage_group.subcommand(
+    sub_cmd_name="restart",
+    sub_cmd_description="Shuts down the bot for manual restart (Bot Owner/Manager only)."
 )
-async def restart_bot_command(ctx):
-    if not is_bot_manager(int(ctx.author.id)):
+async def manage_restart(ctx: SlashContext):
+    if not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID:
         await ctx.send("You do not have permission to use this command.", ephemeral=True)
         return
 
@@ -742,8 +759,8 @@ async def settings(ctx: SlashContext):
 @settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
 async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed to avoid conflict if settings was a class
-    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
-        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
+        await ctx.send("You need Administrator permissions or be the Bot Owner to use this command.", ephemeral=True)
         return
 
     if add_bot_manager(int(user.id)):
@@ -754,8 +771,8 @@ async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed t
 @settings.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
 @slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
 async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
-    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
-        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
+        await ctx.send("You need Administrator permissions or be the Bot Owner to use this command.", ephemeral=True)
         return
 
     if int(user.id) == OWNER_ID:
@@ -769,8 +786,8 @@ async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
 
 @settings.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
 async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
-    if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
-        await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
+    if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID :
+        await ctx.send("You need Administrator permissions or be a Bot Manager/Owner to use this command.", ephemeral=True)
         return
 
     managers = load_bot_managers()
