@@ -134,7 +134,7 @@ async def petpet(ctx, user):
     gif_buffer = await generate_petpet_gif(str(avatar_url)) # Ensure URL is a string
 
     if gif_buffer:
-        await ctx.send(files=[File(file=gif_buffer, filename="petpet.gif")])
+        await ctx.send(files=[File(file=gif_buffer, file_name="petpet.gif")])
     else:
         await ctx.send("Sorry, I couldn't create the petpet animation right now. Maybe the winds of Aeternum are too wild!", ephemeral=True)
 
