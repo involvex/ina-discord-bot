@@ -12,10 +12,10 @@ import re
 # import items # No longer needed for direct data loading
 # import perks # No longer needed for direct data loading
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
-from interactions.models.discord.channel import GuildText # For specific channel type checking
+from interactions.models.discord.channel import GuildText, TextChannel # For specific channel type checking
 from typing import Optional
 import packaging.version  # For version comparison
-from recipes import get_recipe, calculate_crafting_materials, RECIPES
+from recipes import get_recipe, calculate_crafting_materials, RECIPES, track_recipe
 from utils.image_utils import generate_petpet_gif
 import json
 from bs4 import BeautifulSoup
@@ -575,47 +575,33 @@ async def calculate_craft_autocomplete(ctx: SlashContext): # Added type hint
 async def recipe(ctx, item_name: str):
     await ctx.defer() # Defer response
 
-    # track_recipe might need adaptation if it relies on the old global data structures.
-    from recipes import track_recipe # Assuming track_recipe is adapted or its usage is reviewed
-
-    conn = get_db_connection()
-    recipe_json_str = None
+    # Use the get_recipe function from recipes.py which handles DB lookup
+    # from both 'recipes' and 'items' tables.
+    recipe_dict = None
     try:
-        cursor = conn.cursor()
-        # Fetch the 'raw_recipe_data' which stores the full recipe JSON.
-        # Use LIKE for item_name to be more flexible with user input.
-        # Prioritize exact match first if possible, or ensure autocomplete sends exact names.
-        # For simplicity here, LIKE is used.
-        cursor.execute("SELECT raw_recipe_data FROM recipes WHERE output_item_name LIKE ?", (f'%{item_name}%',))
-        row = cursor.fetchone()
-        if row:
-            recipe_json_str = row["raw_recipe_data"]
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error fetching recipe for '{item_name}': {e}")
-    finally:
-        if conn:
-            conn.close()
-
-    if not recipe_json_str:
-        # Optionally, you could still call fetch_recipe_from_nwdb here as a fallback
-        # from recipes import fetch_recipe_from_nwdb
-        # recipe_dict = fetch_recipe_from_nwdb(item_name) # This would need to be async or run in executor
-        # if not recipe_dict:
-        await ctx.send(f"No recipe found for '{item_name}' in the local database.", ephemeral=True)
+        # get_recipe is already imported at the top of the file
+        recipe_dict = get_recipe(item_name)
+    except Exception as e:
+        logging.error(f"Unexpected error in /recipe calling get_recipe for '{item_name}': {e}", exc_info=True)
+        await ctx.send(f"An unexpected error occurred while fetching recipe details for '{item_name}'. Please contact an admin.", ephemeral=True)
         return
-        # else:
-        #     await ctx.send(f"Recipe for '{item_name}' fetched from nwdb.info (external).") # If fetched
 
-    try:
-        recipe_dict = json.loads(recipe_json_str)
-    except json.JSONDecodeError:
-        logging.error(f"Failed to parse recipe JSON for '{item_name}' from database.")
-        await ctx.send(f"Error retrieving recipe details for '{item_name}'.", ephemeral=True)
+    if not recipe_dict:
+        # recipes.get_recipe returns None if not found in 'recipes' or derivable from 'items'
+        await ctx.send(f"No recipe found for '{item_name}' in the local database or item data.", ephemeral=True)
         return
 
     # Track the recipe for the user - ensure track_recipe is adapted for DB if it writes data
+    # track_recipe is now imported at the top of the file.
+    # It uses 'tracked_recipes.json', separate from new_world_data.db
     user_id = str(ctx.author.id)
-    track_recipe(user_id, item_name, recipe_dict) # Review track_recipe for DB compatibility
+    try:
+        track_recipe(user_id, item_name, recipe_dict)
+    except Exception as e:
+        logging.error(f"Error calling track_recipe for user {user_id}, item {item_name}: {e}", exc_info=True)
+        # Optionally inform the user, or just log, as this is a secondary feature.
+        # await ctx.send("Note: Could not save this recipe to your tracked list due to an error.", ephemeral=True)
+
 
     embed = Embed()
     # Use .get() with a fallback to item_name for title, and .title() for consistent casing
