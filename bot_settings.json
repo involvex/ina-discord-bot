@@ -1,0 +1,15 @@
+{
+    "bot_managers": [],
+    "guild_settings": {
+        "636987129204965404": {
+            "logging": {
+                "enabled": true,
+                "channel_id": "744925522328289410"
+            },
+            "welcome": {
+                "enabled": true,
+                "channel_id": "1105739502972051486"
+            }
+        }
+    }
+}

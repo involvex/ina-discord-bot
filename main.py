@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.35" 
+__version__ = "0.2.36" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -66,6 +66,10 @@ NEW_WORLD_WELCOME_MESSAGES = [
     "Welcome, {member_mention}! May your bags be heavy and your Azoth always full here in {guild_name}.",
     "{member_mention} has breached the gates of {guild_name}! Prepare for glory (and maybe some lag).",
 ]
+
+# --- Global Data Stores ---
+ITEM_DATA = {}
+ALL_PERKS_DATA = {}
 
 # --- Master Settings Helper Functions ---
 def load_master_settings():
@@ -259,15 +263,15 @@ async def calculate(ctx, expression: str):
 @slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def nwdb(ctx, item_name: str):
     # Load items from CSV
-    item_data = items.load_items_from_csv('items.csv')
-    if not item_data:
-        await ctx.send("Could not load item data.", ephemeral=True)
+    # item_data = items.load_items_from_csv('items.csv') # No longer load here
+    if not ITEM_DATA:
+        await ctx.send("Item data is not loaded. Please try again later or contact an admin.", ephemeral=True)
         return
     item_name_lower = item_name.lower()
-    if item_name_lower not in item_data:
+    if item_name_lower not in ITEM_DATA:
         await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
         return
-    item = item_data[item_name_lower]
+    item = ITEM_DATA[item_name_lower]
     def get_any(item, keys, default):
         for k in keys:
             if k in item and item[k]:
@@ -322,19 +326,19 @@ async def nwdb(ctx, item_name: str):
 @nwdb.autocomplete("item_name")
 async def nwdb_autocomplete(ctx):
     # Provide autocomplete suggestions from items.csv
-    item_data = items.load_items_from_csv('items.csv')
-    if not item_data:
+    # item_data = items.load_items_from_csv('items.csv') # No longer load here
+    if not ITEM_DATA:
         await ctx.send(choices=[])
         return
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    matches = [name for name in item_data.keys() if search_term in name]
+    matches = [name for name in ITEM_DATA.keys() if search_term in name]
     
     choices = []
     for match_key in list(matches)[:25]:
         # Assuming item_data[match_key] is a dict containing item details
         # and has a field like 'Name' or 'name' for the display name.
         # Fallback to title-cased key if specific name field isn't found.
-        item_details = item_data.get(match_key, {})
+        item_details = ITEM_DATA.get(match_key, {})
         display_name = item_details.get('Name', item_details.get('name', match_key.title()))
         choices.append({"name": display_name, "value": match_key}) # Send the key (lowercase) as value
 
@@ -404,11 +408,11 @@ async def recipe(ctx, item_name: str):
 async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     # Load all items from CSV for autocomplete
-    item_data = items.load_items_from_csv('items.csv')
-    if not item_data:
+    # item_data = items.load_items_from_csv('items.csv') # No longer load here
+    if not ITEM_DATA:
         await ctx.send(choices=[])
         return
-    matches = [name for name in item_data.keys() if search_term in name]
+    matches = [name for name in ITEM_DATA.keys() if search_term in name]
     choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
     await ctx.send(choices=choices)
 
@@ -553,17 +557,17 @@ async def build_remove_autocomplete(ctx: SlashContext):
     autocomplete=True
 )
 async def perk_command(ctx, perk_name: str):
-    all_perks_data = perks.load_perks_from_csv() # Using the function from perks.py
-    if not all_perks_data:
-        await ctx.send("Could not load perk data. Please check server logs.", ephemeral=True)
+    # all_perks_data = perks.load_perks_from_csv() # No longer load here
+    if not ALL_PERKS_DATA:
+        await ctx.send("Perk data is not loaded. Please try again later or contact an admin.", ephemeral=True)
         return
 
     perk_name_lower = perk_name.lower()
-    if perk_name_lower not in all_perks_data:
+    if perk_name_lower not in ALL_PERKS_DATA:
         await ctx.send(f"Perk '{perk_name}' not found in the database.", ephemeral=True)
         return
 
-    perk_info = all_perks_data[perk_name_lower]
+    perk_info = ALL_PERKS_DATA[perk_name_lower]
 
     # Helper to get values safely, similar to the one in /nwdb
     def get_any_perk_info(data, keys, default):
@@ -641,8 +645,8 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
 
 @perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx):
-    all_perks_data = perks.load_perks_from_csv()
-    if not all_perks_data:
+    # all_perks_data = perks.load_perks_from_csv() # No longer load here
+    if not ALL_PERKS_DATA:
         await ctx.send(choices=[])
         return
 
@@ -651,7 +655,7 @@ async def perk_autocomplete(ctx):
     # Match against the keys of all_perks_data (which are lowercase perk names)
     # Then retrieve the original display name from the 'name' field in the perk's data for the choice's name
     matches = []
-    for perk_key_lower, perk_data_dict in all_perks_data.items():
+    for perk_key_lower, perk_data_dict in ALL_PERKS_DATA.items():
         if search_term in perk_key_lower:
             # Try to get the original cased name for display
             display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title()))
@@ -1340,12 +1344,29 @@ async def check_for_updates():
         
         await asyncio.sleep(UPDATE_CHECK_INTERVAL_SECONDS)
 
+def load_all_game_data():
+    """Loads all necessary game data from CSV files into global variables."""
+    global ITEM_DATA, ALL_PERKS_DATA
+    logging.info("Starting to load game data...")
+
+    ITEM_DATA = items.load_items_from_csv('items.csv')
+    if not ITEM_DATA:
+        logging.error("CRITICAL: Failed to load item_data from items.csv! Item-related commands will fail.")
+    else:
+        logging.info(f"Successfully loaded {len(ITEM_DATA)} items.")
+
+    ALL_PERKS_DATA = perks.load_perks_from_csv()
+    if not ALL_PERKS_DATA:
+        logging.error("CRITICAL: Failed to load all_perks_data from perks.csv! Perk-related commands will fail.")
+    else:
+        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks.")
+    logging.info("Game data loading process complete.")
+
 @bot.event()
 async def on_ready():
-
-
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
     asyncio.create_task(check_for_updates())
+    logging.info(f"Ina is ready! Logged in as {bot.user.username} ({bot.user.id})")
 
 if __name__ == "__main__":
     try:
