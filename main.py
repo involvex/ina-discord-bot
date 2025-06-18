@@ -42,7 +42,7 @@ BUILDS_FILE = 'saved_builds.json'
 
 # --- Update Checker Configuration ---
 GITHUB_REPO_OWNER = "involvex"
-GITHUB_REPO_NAME = "ina-discord-bot"
+GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
 # URL to a file on the main branch containing the version string (e.g., "0.1.1")
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Check every 6 hours
