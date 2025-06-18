@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.24" 
+__version__ = "0.2.25" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -396,7 +396,7 @@ async def build_group(ctx: SlashContext):
     """Base command for build management."""
     pass
 
-@build_group.subcommand(name="add", description="Add a build from nw-buddy.de.")
+@build_group.subcommand(sub_cmd_name="add", sub_cmd_description="Add a build from nw-buddy.de.")
 @slash_option("link", "The nw-buddy.de build link", opt_type=OptionType.STRING, required=True)
 @slash_option("name", "A name for this build", opt_type=OptionType.STRING, required=True)
 @slash_option("keyperks", "Comma-separated list of key perks (optional, paste from Perk stacks)", opt_type=OptionType.STRING, required=False)
@@ -440,7 +440,7 @@ async def build_add(ctx: SlashContext, link: str, name: str, keyperks: str = Non
     await ctx.send(f"Build '{name}' added!", ephemeral=True)
 
 
-@build_group.subcommand(name="list", description="Show a list of saved builds.")
+@build_group.subcommand(sub_cmd_name="list", sub_cmd_description="Show a list of saved builds.")
 async def build_list(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
@@ -469,8 +469,8 @@ async def build_list(ctx: SlashContext):
 
 
 @build_group.subcommand(
-    name="remove",
-    description="Remove a saved build (requires 'Manage Server' permission)."
+    sub_cmd_name="remove",
+    sub_cmd_description="Remove a saved build (requires 'Manage Server' permission)."
 )
 @slash_option(
     "name",
@@ -838,7 +838,7 @@ async def settings(ctx: SlashContext):
     # if called directly, though usually users will invoke subcommands.
     pass
 
-@settings.subcommand(name="permit", description="Grants a user bot management permissions.")
+@settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
 async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed to avoid conflict if settings was a class
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
@@ -850,7 +850,7 @@ async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed t
     else:
         await ctx.send(f"ℹ️ {user.mention} already has bot management permissions.", ephemeral=True)
 
-@settings.subcommand(name="unpermit", description="Revokes a user's bot management permissions.")
+@settings.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
 @slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
 async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
@@ -866,7 +866,7 @@ async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
     else:
         await ctx.send(f"ℹ️ {user.mention} does not have bot management permissions.", ephemeral=True)
 
-@settings.subcommand(name="listmanagers", description="Lists users with bot management permissions.")
+@settings.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
 async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID :
         await ctx.send("You need Administrator permissions or be a Bot Manager/Owner to use this command.", ephemeral=True)
@@ -897,7 +897,7 @@ async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
 
 
 # Define the subcommand group 'welcomemessages' under 'settings'
-@settings.subcommand(name="welcomemessages", description="Manage welcome messages for new members.")
+@settings.subcommand(sub_cmd_name="welcomemessages", sub_cmd_description="Manage welcome messages for new members.")
 async def settings_welcomemessages_group(ctx: SlashContext): # Renamed function to indicate it's the group base
     """Base for welcome message settings."""
     pass
@@ -958,7 +958,7 @@ async def settings_welcomemessages_status(ctx: SlashContext):
         await ctx.send("ℹ️ Welcome messages are currently **disabled** for this server.", ephemeral=True)
 
 # Define the subcommand group 'logging' under 'settings'
-@settings.subcommand(name="logging", description="Manage server activity logging.")
+@settings.subcommand(sub_cmd_name="logging", sub_cmd_description="Manage server activity logging.")
 async def settings_logging_group(ctx: SlashContext): # Renamed function to indicate it's the group base
     """Base for server activity logging settings."""
     pass
