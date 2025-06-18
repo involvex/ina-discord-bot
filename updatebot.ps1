@@ -59,7 +59,11 @@ Write-Host ""
 # --- Fetch latest changes from all remotes ---
 Write-Host "Fetching latest updates from remote repository..."
 try {
-    git fetch --all --progress -ErrorAction Stop
+    git fetch --all --progress
+    if ($LASTEXITCODE -ne 0) {
+        # Force a PowerShell terminating error if git command failed
+        throw "Git fetch command failed with exit code $LASTEXITCODE."
+    }
     Write-Host "Fetch successful."
 }
 catch {

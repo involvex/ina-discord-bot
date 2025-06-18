@@ -22,7 +22,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.1.5" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.1.6" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -38,6 +38,7 @@ if not bot_token:
 bot = Client(token=bot_token)
 
 BUILDS_FILE = 'saved_builds.json'
+OWNER_ID = 157968227106947072 # Your Discord User ID
 
 # --- Update Checker Configuration ---
 GITHUB_REPO_OWNER = "involvex"
@@ -67,7 +68,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "builds": "Show a list of saved builds.",
         "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
         "perk": "Look up information about a specific New World perk.",
-        "about": "Show information about Ina's New World Bot."
+        "about": "Show information about Ina's New World Bot.",
+        "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -508,6 +510,54 @@ async def about_command(ctx):
     )
     embed.set_footer(text="Ina's New World Bot is a fan-made project and is not affiliated with Amazon Games or New World.")
     await ctx.send(embeds=embed)
+
+@slash_command(
+    "updatebot",
+    description="Pulls the latest updates from GitHub and prepares the bot for a restart (Owner only)."
+)
+async def update_bot_command(ctx):
+    if ctx.author.id != OWNER_ID:
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+
+    await ctx.defer(ephemeral=True) # Acknowledge interaction, make response visible only to user
+
+    # Construct the path to update_bot.ps1
+    # main.py is in interactions.py, update_bot.ps1 is one level up.
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'update_bot.ps1'))
+
+    if not os.path.exists(script_path):
+        logging.error(f"Update script not found at: {script_path}")
+        await ctx.send(f"Error: Update script not found at the expected location: `{script_path}`.", ephemeral=True)
+        return
+
+    try:
+        logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) initiated bot update using script: {script_path}")
+        # Using asyncio.create_subprocess_exec for non-blocking execution
+        process = await asyncio.create_subprocess_exec(
+            'powershell.exe',
+            '-ExecutionPolicy', 'Bypass', # To ensure the script can run
+            '-File', script_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await process.communicate() # Wait for the script to complete
+
+        response_message = "🚀 **Update Script Execution** 🚀\n"
+        if process.returncode == 0:
+            response_message += "✅ Script executed successfully.\n"
+        else:
+            response_message += f"⚠️ Script finished with exit code: {process.returncode}.\n"
+
+        if stdout:
+            response_message += f"**Output:**\n```powershell\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+        if stderr:
+            response_message += f"**Errors:**\n```powershell\n{stderr.decode('utf-8', errors='ignore')[:1500]}\n```\n"
+        response_message += "\nℹ️ **Please manually restart the bot process to apply any downloaded updates.**"
+        await ctx.send(response_message, ephemeral=True)
+    except Exception as e:
+        logging.error(f"Error executing update script: {e}", exc_info=True)
+        await ctx.send(f"An error occurred while trying to run the update script: {e}", ephemeral=True)
 
 # Mention handler
 @bot.event()
