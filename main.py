@@ -11,14 +11,13 @@ import unicodedata
 import re
 import items
 import perks # Import the new perks module
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, TextChannel
 from typing import Optional
 import packaging.version # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
 import json
 from bs4 import BeautifulSoup
 import requests
-from interactions.models import TextChannel # Import TextChannel here
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
