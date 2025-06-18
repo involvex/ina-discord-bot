@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.66" 
+__version__ = "0.2.67" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -1357,9 +1357,9 @@ SILLY_MENTION_RESPONSES = [
 
 # Mention handler
 @bot.event()
-async def on_message_create(event_name: str, message: Message):
+async def on_message_create(message: Message): # Removed event_name parameter
     """Handles new messages, specifically for bot mentions."""
-    # The 'message' argument is directly the Message object.
+    # The 'message' argument is directly the Message object from the library.
     if not message:
         return
     # Ensure message is a Message object, not a string or other type if dispatch is unexpected
