@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.90" 
+__version__ = "0.2.91" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -889,12 +889,14 @@ async def perk_command(ctx, perk_name: str):
 
     # Scale description if applicable (ensure scale_value_with_gs is robust)
     scaled_description = scale_value_with_gs(str(description_raw))
+    perk_type_display = str(perk_type_raw).strip() if perk_type_raw and str(perk_type_raw).strip() else "Unknown Type"
+
     embed.add_field(name="Description", value=scaled_description, inline=False)
-    embed.add_field(name="Type", value=str(perk_type_raw), inline=True)
+    embed.add_field(name="Type", value=perk_type_display, inline=True)
 
     # This field is highly specific to Craft Mods
-    if is_craft_mod:
-        if craft_mod_item_name:
+    if is_craft_mod and craft_mod_item_name and str(craft_mod_item_name).strip():
+        # Only add if it's a craft mod AND has a craft mod item name
             embed.add_field(name="Crafted With / Source", value=str(craft_mod_item_name), inline=True)
         
     # Add "Scales with Gear Score" note if placeholders were in description, indicating bot performed scaling.
@@ -903,22 +905,30 @@ async def perk_command(ctx, perk_name: str):
         embed.add_field(name="Scaling", value="Values scale with Gear Score (shown at 725 GS)", inline=True)
 
     # These fields will now be attempted for ALL perks if data is available
-    if condition:
-        embed.add_field(name="Condition", value=str(condition), inline=False) # Often longer
+    condition_display = str(condition).strip() if condition and str(condition).strip() else "-"
+    embed.add_field(name="Condition", value=condition_display, inline=False) # Often longer
 
-    if compatible_with_raw:
+    compatible_display = "-"
+    if compatible_with_raw and str(compatible_with_raw).strip():
         compatible_list = [item.strip() for item in str(compatible_with_raw).split(',') if item.strip()]
         if compatible_list:
             # A more sophisticated mapping could be added here later to make names friendlier
             # e.g., "1HSword" -> "Sword", "2HGreatAxe" -> "Great Axe"
-            formatted_compatible = ", ".join(compatible_list)
-            embed.add_field(name="Compatible With", value=formatted_compatible, inline=False)
+            compatible_display = ", ".join(compatible_list)
+    embed.add_field(name="Compatible With", value=compatible_display, inline=False)
 
-    if exclusive_labels_raw:
+    exclusive_display = "-"
+    # Handle cases where exclusive_labels_raw might be a single string or a comma-separated list
+    # Prefer ExclusiveLabels (plural, from list) if available, then ExclusiveLabel (singular)
+    labels_to_process = get_any_perk_info(perk_info, ['ExclusiveLabels'], None) # Check plural first
+    if not labels_to_process or not str(labels_to_process).strip():
+        labels_to_process = get_any_perk_info(perk_info, ['ExclusiveLabel', 'MutatorGroup'], None) # Fallback to singular
+
+    if labels_to_process and str(labels_to_process).strip():
         exclusive_list = [label.strip() for label in str(exclusive_labels_raw).split(',') if label.strip()]
         if exclusive_list:
-            formatted_exclusive = ", ".join(exclusive_list)
-            embed.add_field(name="Exclusive Labels", value=formatted_exclusive, inline=True) # Usually short
+            exclusive_display = ", ".join(exclusive_list)
+    embed.add_field(name="Exclusive Labels", value=exclusive_display, inline=True) # Usually short
 
     if perk_id:
         embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/perk/{str(perk_id).strip()})", inline=True)
