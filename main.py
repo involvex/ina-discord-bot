@@ -7,7 +7,6 @@ import uuid
 import math
 import subprocess
 import platform # For OS detection
-import unicodedata
 import re
 # import items # No longer needed for direct data loading
 # import perks # No longer needed for direct data loading
@@ -69,6 +68,7 @@ async def find_item_in_db(item_name_query: str, exact_match: bool = False):
             conn.close()
     return results
 
+
 # Your command would then call find_item_in_db(item_name)
 
 # --- Function to find perks in DB ---
@@ -95,6 +95,29 @@ async def find_perk_in_db(perk_name_query: str, exact_match: bool = False):
     finally:
         if conn:
             conn.close()
+
+    # Attempt immediate re-scraping/re-import of data on a "not found" result for more recent bot data
+    # Note: In a production bot, you might want to rate-limit or restrict who/when this is allowed for performance/data integrity
+    if not results:
+        logging.info(
+            f"No perk '{perk_name_query}' found in database, attempting to auto-run perk data update."
+        )
+        current_os = platform.system().lower()
+        if "windows" in current_os:
+            update_perks_script = os.path.abspath(os.path.join(os.path.dirname(__file__), "update_perks.ps1"))
+            subprocess.run(["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", update_perks_script], capture_output=True, text=True)
+        elif "linux" in current_os:
+            update_perks_script = os.path.abspath(os.path.join(os.path.dirname(__file__), "update_perks.sh"))
+            subprocess.run(["/bin/bash", update_perks_script], capture_output=True, text=True)
+        else:
+            logging.warning(f"Unsupported OS ({current_os}) for running update_perks script. Manual intervention needed")
+            return results  # Return current empty results
+
+        # Re-query now - the script SHOULD have re-scraped and updated the DB if it worked.
+        results = await find_perk_in_db(perk_name_query, exact_match=exact_match)
+        if results:
+            logging.info(f"Automatic perk update succeeded. '{perk_name_query}' found in updated data.")
+
     return results
 
 # Load environment variables from .env file
@@ -102,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.73" 
+__version__ = "0.2.74" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
