@@ -5,6 +5,7 @@ Store crafting recipes for New World items
 import requests
 from bs4 import BeautifulSoup
 import json
+import logging
 
 TRACKED_RECIPES_FILE = 'tracked_recipes.json'
 
@@ -93,36 +94,61 @@ RECIPES = {
     # ... other recipes ...
 }
 
-# Add aliases after RECIPES is fully defined
-RECIPES["gorgon's amulet"] = RECIPES["gorgonite amulet"]
 
-def get_recipe(item_name: str, global_item_data: dict):
+def get_recipe(item_name: str, global_item_data: dict, item_id_to_name_map: dict):
     # Try local recipes first
-    recipe = RECIPES.get(item_name.lower())
-    if recipe:
-        return recipe
+    item_name_lower = item_name.lower()
+    if item_name_lower in RECIPES:
+        return RECIPES[item_name_lower]
+
     # Try to get from items.csv if it has a recipe
-    # Use the globally loaded item_data passed as an argument
-    if global_item_data and item_name.lower() in global_item_data:
-        row = global_item_data[item_name.lower()]
-        # Try to extract recipe info if present
-        if 'Crafting Recipe' in row and row['Crafting Recipe']:
-            # This is a placeholder: you may need to parse the recipe string or link to a recipe id
+    if global_item_data and item_name_lower in global_item_data:
+        row = global_item_data[item_name_lower]
+        crafting_recipe_str = row.get('Crafting Recipe')
+
+        if crafting_recipe_str:
+            parsed_ingredients = []
+            try:
+                ingredient_pairs = crafting_recipe_str.split(',')
+                for pair in ingredient_pairs:
+                    if not pair.strip(): # Skip empty parts if any (e.g., trailing comma)
+                        continue
+                    parts = pair.split(':')
+                    if len(parts) == 2:
+                        item_id_for_ingredient = parts[0].strip()
+                        quantity_str = parts[1].strip()
+                        quantity = int(quantity_str)
+
+                        # Resolve item_id_for_ingredient to actual name using item_id_to_name_map
+                        ingredient_name = item_id_to_name_map.get(item_id_for_ingredient, item_id_for_ingredient)
+                        parsed_ingredients.append({'item': ingredient_name, 'quantity': quantity})
+                    else:
+                        logging.warning(f"Malformed ingredient pair '{pair}' in recipe string for '{item_name}': '{crafting_recipe_str}'")
+            except ValueError as e:
+                logging.error(f"Error parsing quantity in recipe string for '{item_name}': '{crafting_recipe_str}'. Error: {e}")
+                # Decide if you want to return partial recipe or None
+            except Exception as e:
+                logging.error(f"Unexpected error parsing recipe string for '{item_name}': '{crafting_recipe_str}'. Error: {e}")
+
+            # Station and Skill Name are not directly available in items.csv for the item itself.
+            # Required Tradeskill Rank is the skill level.
             return {
-                'station': row.get('Station', '-'),
-                'skill': row.get('Required Tradeskill Rank', '-'),
+                'station': '-', # Not directly available in item's row in items.csv
+                'skill': 'Unknown', # Skill name not directly available in item's row
                 'skill_level': row.get('Required Tradeskill Rank', '-'),
                 'tier': row.get('Tier', '-'),
-                'ingredients': []  # Could be parsed if format is known
+                'ingredients': parsed_ingredients
             }
     return None
 
 
-def calculate_crafting_materials(item_name: str, global_item_data: dict, quantity: int = 1, include_intermediate: bool = False):
-    recipe = get_recipe(item_name, global_item_data)
+def calculate_crafting_materials(item_name: str, global_item_data: dict, item_id_to_name_map: dict, quantity: int = 1, include_intermediate: bool = False):
+    # Note: This function currently only calculates direct materials.
+    # A full recursive calculation for `include_intermediate=True` is more complex.
+    recipe = get_recipe(item_name, global_item_data, item_id_to_name_map)
     if not recipe:
         return None
     materials = {}
-    for ing in recipe["ingredients"]:
-        materials[ing["item"]] = ing["quantity"] * quantity
+    for ing in recipe.get("ingredients", []):
+        materials[ing["item"]] = materials.get(ing["item"], 0) + (ing["quantity"] * quantity)
     return materials

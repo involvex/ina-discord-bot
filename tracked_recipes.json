@@ -110,6 +110,60 @@
           }
         ]
       }
+    },
+    {
+      "item_name": "gorgonite amulet",
+      "recipe": {
+        "station": "Outfitting Station",
+        "skill": "Jewelcrafting",
+        "skill_level": 250,
+        "tier": 5,
+        "ingredients": [
+          {
+            "item": "Gorgon's Eye",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Chain",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Setting",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Ingot",
+            "quantity": 6
+          }
+        ]
+      }
+    },
+    {
+      "item_name": "gorgonite amulet",
+      "recipe": {
+        "station": "Outfitting Station",
+        "skill": "Jewelcrafting",
+        "skill_level": 250,
+        "tier": 5,
+        "ingredients": [
+          {
+            "item": "Gorgon's Eye",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Chain",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Setting",
+            "quantity": 1
+          },
+          {
+            "item": "Prismatic Ingot",
+            "quantity": 6
+          }
+        ]
+      }
     }
   ]
 }
