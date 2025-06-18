@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.54" 
+__version__ = "0.2.55" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -515,14 +515,42 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
     
     # Assuming get_recipe is adapted to use the database and returns a dict or None
     # This function needs to query DB_NAME (logic would be in recipes.py)
-    recipe_details = get_recipe(item_name) 
+    recipe_details = None
+    try:
+        recipe_details = get_recipe(item_name)
+    except TypeError as e:
+        if "missing" in str(e) and "required positional argument" in str(e) and ("global_item_data" in str(e) or "item_id_to_name_map" in str(e)):
+            logging.error(f"TypeError in calculate_craft calling get_recipe for '{item_name}': {e}. "
+                          "This likely means 'recipes.py' (get_recipe function) has not been updated "
+                          "to use the database and still expects old in-memory data arguments.")
+            await ctx.send(f"⚠️ Error: The recipe system for '{item_name}' seems to be outdated. Please contact the bot administrator. "
+                           "(Technical detail: `get_recipe` in `recipes.py` needs an update for database integration).", ephemeral=True)
+            return
+        else:
+            logging.error(f"Unexpected TypeError in calculate_craft calling get_recipe for '{item_name}': {e}", exc_info=True)
+            await ctx.send(f"An unexpected error occurred while fetching recipe details for '{item_name}'.", ephemeral=True)
+            return # Or re-raise e if you have a global error handler
 
     if not recipe_details: # If get_recipe returns None or empty
         await ctx.send(f"Recipe for '{item_name}' not found or item is not craftable.", ephemeral=True)
         return
     
     # Show all resources, including intermediates
-    all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True) # This function also needs to be adapted in recipes.py to use the DB
+    all_materials = None
+    try:
+        all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True) # This function also needs to be adapted in recipes.py to use the DB
+    except TypeError as e:
+        if "missing" in str(e) and "required positional argument" in str(e): # Add more specific checks if needed
+            logging.error(f"TypeError in calculate_craft calling calculate_crafting_materials for '{item_name}': {e}. "
+                          "This likely means 'recipes.py' (calculate_crafting_materials function) has not been updated.")
+            await ctx.send(f"⚠️ Error: The crafting calculation for '{item_name}' encountered an issue. Please contact the bot administrator. "
+                           "(Technical detail: `calculate_crafting_materials` in `recipes.py` needs an update).", ephemeral=True)
+            return
+        else:
+            logging.error(f"Unexpected TypeError in calculate_craft calling calculate_crafting_materials for '{item_name}': {e}", exc_info=True)
+            await ctx.send(f"An unexpected error occurred while calculating materials for '{item_name}'.", ephemeral=True)
+            return # Or re-raise e
+
     if not all_materials: # If calculate_crafting_materials returns None or empty
         await ctx.send(f"Could not calculate materials for '{item_name}'. Ensure it's a craftable item with a known recipe.", ephemeral=True)
         return
