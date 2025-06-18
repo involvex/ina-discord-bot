@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.63" 
+__version__ = "0.2.65" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -410,12 +410,18 @@ async def nwdb(ctx, item_name: str):
         return default
 
     name = get_any(item, ['Name', 'name'], item_name) # 'Name' is likely the sanitized column
-    item_id_for_url = get_any(item, ['Item ID', 'ItemID'], None) # Becomes 'Item_ID' or 'ItemID'
+    item_id_for_url = get_any(item, ['Item ID', 'ItemID'], None) # Becomes 'Item_ID'
     description = get_any(item, ['Description', 'description', 'Flavor Text'], 'No description available.') # 'Flavor_Text'
     rarity = get_any(item, ['Rarity', 'rarity'], 'Unknown')
     tier = get_any(item, ['Tier', 'tier'], 'Unknown')
-    icon_url = get_any(item, ['Icon', 'icon', 'Icon Path'], None) # 'Icon_Path'
-    
+    icon_url = get_any(item, ['Icon', 'icon', 'Icon Path'], None) # 'Icon_Path' from CSV
+    item_type_name = get_any(item, ['Item Type Name'], 'Unknown Type') # From 'Item Type Name' CSV header
+
+    # New fields to fetch based on CSV headers
+    weight = get_any(item, ['Weight'], None)
+    max_stack = get_any(item, ['Max Stack Size'], None) # From 'Max Stack Size' CSV header
+    ingredient_categories_raw = get_any(item, ['Ingredient Categories'], None) # From 'Ingredient Categories' CSV header
+
     # Build a NWDB-style embed
     embed = Embed()
     embed.title = name
@@ -429,10 +435,19 @@ async def nwdb(ctx, item_name: str):
     embed.color = 0x9b59b6 if str(rarity).lower() == 'artifact' else 0x7289da # Ensure rarity is string for .lower()
     if icon_url:
         embed.set_thumbnail(url=str(icon_url).strip()) # Ensure URL is string and stripped
+    
     embed.add_field(name="Rarity", value=str(rarity), inline=True)
     embed.add_field(name="Tier", value=str(tier), inline=True)
+    embed.add_field(name="Type", value=str(item_type_name), inline=True)
+
+    if weight is not None: # Check for None because 0 is a valid weight
+        embed.add_field(name="Weight", value=str(weight), inline=True)
+    if max_stack:
+        embed.add_field(name="Max Stack", value=str(max_stack), inline=True)
+
     if description and not str(description).startswith('Artifact_'): # Ensure description is string
         embed.add_field(name="Description", value=str(description), inline=False)
+    
     
     gear_score = get_any(item, ['Gear Score', 'gear_score', 'GS'], None) # Becomes 'Gear_Score'
     if gear_score:
@@ -458,25 +473,50 @@ async def nwdb(ctx, item_name: str):
         if perk_lines:
             embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
 
-    # Check if item is craftable by querying the recipes table
+    if ingredient_categories_raw:
+        # The 'Ingredient Categories' column in items.csv uses '|' as a separator
+        categories = [cat.strip() for cat in str(ingredient_categories_raw).split('|') if cat.strip()]
+        if categories:
+            embed.add_field(name="Ingredient Types", value=", ".join(categories), inline=False)
+
+    # Crafting Info section
+    is_recipe_item_flag = name.lower().startswith("recipe:")
+    actual_item_name_from_recipe_item = None
+    if is_recipe_item_flag:
+        actual_item_name_from_recipe_item = name.lower().replace("recipe:", "").strip().title()
+        embed.title = f"Recipe: {actual_item_name_from_recipe_item}" # Update title for recipe items
+        # The embed.url already points to the "Recipe: ..." item page, which is fine.
+
+    # Check if the item (or the item the recipe is for) can be crafted
     conn_check = get_db_connection()
-    is_craftable = False
+    can_be_crafted_flag = False
+    # If it's a recipe item, check if the *target* item is craftable. Otherwise, check the item itself.
+    target_craft_check_name = actual_item_name_from_recipe_item if is_recipe_item_flag else name
     try:
         cursor_check = conn_check.cursor()
-        # Use LIKE for item_name as recipe names might have slight variations or casing differences
-        # Ensure 'output_item_name' is the correct column in your 'recipes' table
-        cursor_check.execute("SELECT 1 FROM recipes WHERE output_item_name LIKE ?", (f'%{name}%',))
+        cursor_check.execute("SELECT 1 FROM recipes WHERE lower(output_item_name) = ?", (target_craft_check_name.lower(),))
         if cursor_check.fetchone():
-            is_craftable = True
+            can_be_crafted_flag = True
     except sqlite3.Error as e:
-        logging.warning(f"Could not check if item {name} is craftable due to DB error: {e}")
+        logging.warning(f"Could not check if item {target_craft_check_name} is craftable due to DB error: {e}")
     finally:
         if conn_check:
             conn_check.close()
 
-    if is_craftable:
-        # Using f-string for item_name to ensure it's correctly part of the command example
+    craft_status_lines = []
+    if is_recipe_item_flag:
+        craft_status_lines.append(f"📜 This is a recipe scroll for **{actual_item_name_from_recipe_item}**.")
+        embed.set_footer(text=f"Type /recipe item_name:\"{actual_item_name_from_recipe_item}\" to see its crafting details!")
+    elif can_be_crafted_flag:
+        craft_status_lines.append("✅ Can be crafted.")
         embed.set_footer(text=f"Type /calculate_craft item_name:\"{name}\" to calculate resources!")
+
+    if not is_recipe_item_flag and (ingredient_categories_raw or 'resource' in str(item_type_name).lower()):
+        craft_status_lines.append("🛠️ Used as a crafting material.")
+
+    if craft_status_lines:
+        embed.add_field(name="Crafting Info", value="\n".join(craft_status_lines), inline=False)
+
     await ctx.send(embeds=embed)
 
 

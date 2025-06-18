@@ -3,7 +3,7 @@ import logging
 import sys
 
 # --- Bot Version ---
-__version__ = "0.2.7"
+__version__ = "0.2.64"
 
 # --- Core Bot Config ---
 OWNER_ID = 157968227106947072  # Your Discord User ID
