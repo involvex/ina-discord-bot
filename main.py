@@ -57,7 +57,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "addbuild": "Add a build from nw-buddy.de with a name and optional key perks.",
         "builds": "Show a list of saved builds.",
         "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
-        "perk": "Look up information about a specific New World perk."
+        "perk": "Look up information about a specific New World perk.",
+        "about": "Show information about Ina's New World Bot."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -428,6 +429,27 @@ async def perk_autocomplete(ctx):
             
     await ctx.send(choices=unique_matches)
 
+
+@slash_command("about", description="Show information about Ina's New World Bot.")
+async def about_command(ctx):
+    embed = Embed(
+        title="About Ina's New World Bot",
+        description="Your friendly companion for all things Aeternum!",
+        color=0x7289DA  # Discord Blurple
+    )
+    embed.add_field(
+        name="Creator",
+        value="This bot was lovingly crafted by <@157968227106947072>.",
+        inline=False
+    )
+    embed.add_field(
+        name="Credits & Data Sources",
+        value="• Item and perk data often references [NWDB.info](https://nwdb.info).\n"
+              "• Build functionality integrates with [NW-Buddy.de](https://nw-buddy.de).",
+        inline=False
+    )
+    embed.set_footer(text="Ina's New World Bot is a fan-made project and is not affiliated with Amazon Games or New World.")
+    await ctx.send(embeds=embed)
 
 # Mention handler
 @bot.event()
