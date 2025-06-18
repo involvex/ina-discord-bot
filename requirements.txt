@@ -35,3 +35,4 @@ emoji
 tomli
 python-dotenv>=1.0.0
 packaging>=23.0
+typing-extensions>=4.7.1
