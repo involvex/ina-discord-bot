@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.102" 
+__version__ = "0.2.103" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -994,7 +994,7 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
     Scales numeric values within a perk description string based on Gear Score.
     Replaces placeholders like ${expression * perkMultiplier} or ${value} with their calculated/literal values.
     """
-    if not base_value or '${' not in base_value:
+    if not base_value: # If base_value is None or empty, return it.
         return base_value
 
     base_gs = 500  # Assume base values for perkMultiplier are for GS 500
