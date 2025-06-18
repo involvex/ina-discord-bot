@@ -28,6 +28,52 @@ Write-Host "===================================" -ForegroundColor Green
 Write-Host "Ina's New World Bot Updater" -ForegroundColor Green
 Write-Host "===================================" -ForegroundColor Green
 Write-Host ""
+# Get the directory of the script
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+
+# Navigate to the script's directory (root of your Git repo)
+Set-Location $ScriptDir
+
+Write-Host "Starting forceful update..."
+
+# Fetch all remote branches and tags
+git fetch --all
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Error: git fetch failed."
+  exit 1
+}
+
+# Hard reset the local main branch to match the remote origin/main
+# Replace 'main' with your default branch name if it's different (e.g., master)
+git reset --hard origin/main
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Error: git reset --hard origin/main failed."
+  exit 1
+}
+
+# Remove untracked files and directories, including those in .gitignore
+# Use with caution: -x also removes ignored files. If you don't want that, remove the 'x'.
+git clean -fdx
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Error: git clean -fdx failed."
+  exit 1
+}
+
+Write-Host "Local repository forcefully updated to origin/main and cleaned."
+
+# Optional: Reinstall dependencies if requirements.txt might have changed
+if (Test-Path "requirements.txt") {
+  Write-Host "Reinstalling dependencies from requirements.txt..."
+  # Adjust pip command as needed (e.g., pip3, or path to venv pip)
+  pip install -U -r requirements.txt
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Warning: pip install -r requirements.txt failed. Dependencies might be outdated."
+    # Decide if this should be a fatal error (exit 1) or just a warning
+  }
+}
+
+Write-Host "Update script completed. Bot will be restarted by the main Python script."
+exit 0
 
 # --- Check for Git ---
 try {

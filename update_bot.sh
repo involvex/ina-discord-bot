@@ -22,6 +22,55 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 BotDirectory="$SCRIPT_DIR"
 GitBranch="main"
 
+
+# Get the directory of the script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Navigate to the script's directory (root of your Git repo)
+cd "$SCRIPT_DIR" || exit 1
+
+echo "Starting forceful update..."
+
+# Fetch all remote branches and tags
+git fetch --all
+if [ $? -ne 0 ]; then
+  echo "Error: git fetch failed."
+  exit 1
+fi
+
+# Hard reset the local main branch to match the remote origin/main
+# Replace 'main' with your default branch name if it's different (e.g., master)
+git reset --hard origin/main
+if [ $? -ne 0 ]; then
+  echo "Error: git reset --hard origin/main failed."
+  exit 1
+fi
+
+# Remove untracked files and directories, including those in .gitignore
+# Use with caution: -x also removes ignored files. If you don't want that, remove the 'x'.
+git clean -fdx
+if [ $? -ne 0 ]; then
+  echo "Error: git clean -fdx failed."
+  exit 1
+fi
+
+echo "Local repository forcefully updated to origin/main and cleaned."
+
+# Optional: Reinstall dependencies if requirements.txt might have changed
+# Make sure pip is available or use the full path to your virtual environment's pip
+if [ -f "requirements.txt" ]; then
+  echo "Reinstalling dependencies from requirements.txt..."
+  # Adjust pip command as needed (e.g., pip3, or path to venv pip)
+  pip install -U -r requirements.txt
+  if [ $? -ne 0 ]; then
+    echo "Warning: pip install -r requirements.txt failed. Dependencies might be outdated."
+    # Decide if this should be a fatal error (exit 1) or just a warning
+  fi
+fi
+
+echo "Update script completed. Bot will be restarted by the main Python script."
+exit 0
+
 # --- Check for Git ---
 if ! command -v git &> /dev/null
 then

@@ -587,6 +587,8 @@ async def _perform_update_and_restart(slash_ctx: Optional[SlashContext] = None):
 
     try:
         logging.info(f"{initiator_desc} initiated bot update using {executable} with script: {script_path}")
+        # The script (e.g., update_bot.sh or update_bot.ps1) is responsible for the actual Git operations,
+        # including how updates are fetched (e.g., git pull, git reset --hard for force updates).
         # Using asyncio.create_subprocess_exec for non-blocking execution
         # Full command: executable *script_args script_path
         process = await asyncio.create_subprocess_exec(
