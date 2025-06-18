@@ -398,19 +398,49 @@ async def perk_command(ctx, perk_name: str):
     embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
     await ctx.send(embeds=embed)
 
+def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
+    """
+    Safely evaluates a perk expression string after substituting perkMultiplier.
+    Example: expr_str = "2.4 * perkMultiplier", gs_multiplier_val = 1.45
+    """
+    try:
+        # Replace perkMultiplier with its numeric value
+        eval_str = expr_str.replace("perkMultiplier", str(gs_multiplier_val))
+
+        # Define a safe environment for eval
+        allowed_globals = {"__builtins__": {}}
+        allowed_locals = {} # No extra functions needed for simple arithmetic like "2.4 * 1.45"
+
+        result = eval(eval_str, allowed_globals, allowed_locals)
+
+        if isinstance(result, float):
+            if result.is_integer():
+                return str(int(result))
+            # Format to a reasonable number of decimal places, remove trailing zeros
+            formatted_result = f"{result:.3f}".rstrip('0').rstrip('.')
+            return formatted_result
+        return str(result)
+    except Exception as e:
+        logging.warning(f"Could not evaluate perk expression '{expr_str}' with multiplier {gs_multiplier_val}: {e}")
+        # Return the original expression part to indicate an issue or a placeholder error.
+        return f"[EVAL_ERROR: {expr_str}]"
 
 def scale_value_with_gs(base_value: str, gear_score: int = 725) -> str:
-    """Scale values with gear score based on assumption that base values are for a lower GS"""
-    # Check if base value is something we can scale.
+    """
+    Scales numeric values within a perk description string based on Gear Score.
+    Replaces placeholders like ${expression * perkMultiplier} or ${value} with their calculated/literal values.
+    """
     if not base_value or '${' not in base_value:
         return base_value
-    # Assume scaling is linear with GS.
-    # This might not be 100% accurate but a decent approximation
-    # Most values seem to scale from base GS 500.
-    base_gs = 500
-    multiplier = gear_score / base_gs
-    scaled_value = base_value.replace('perkMultiplier', str(multiplier))
-    return scaled_value
+
+    base_gs = 500  # Assume base values for perkMultiplier are for GS 500
+    gs_multiplier = gear_score / base_gs
+
+    def replace_match(match):
+        expression_inside_braces = match.group(1) # Content within ${...}
+        return _eval_perk_expression(expression_inside_braces, gs_multiplier)
+
+    return re.sub(r'\$\{(.*?)\}', replace_match, base_value)
 
 @perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx):
@@ -427,7 +457,7 @@ async def perk_autocomplete(ctx):
     for perk_key_lower, perk_data_dict in all_perks_data.items():
         if search_term in perk_key_lower:
             # Try to get the original cased name for display
-            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title())) # Original casing for display
+            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title()))
             matches.append({"name": display_name, "value": display_name}) # Send original cased name as value too
 
     # Ensure unique choices by name (in case of slight variations leading to same display name)
