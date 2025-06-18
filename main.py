@@ -6,6 +6,7 @@ import asyncio
 import uuid
 import math
 import subprocess
+import platform # For OS detection
 import unicodedata
 import re
 import items
@@ -522,9 +523,27 @@ async def update_bot_command(ctx):
 
     await ctx.defer(ephemeral=True) # Acknowledge interaction, make response visible only to user
 
-    # Construct the path to update_bot.ps1
-    # main.py is in interactions.py, update_bot.ps1 is one level up.
-    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'update_bot.ps1'))
+    # Determine OS and script details
+    current_os = platform.system().lower()
+    script_name = ""
+    executable = ""
+
+    if "windows" in current_os:
+        script_name = "update_bot.ps1"
+        executable = "powershell.exe"
+        script_args = ['-ExecutionPolicy', 'Bypass', '-File']
+    elif "linux" in current_os:
+        script_name = "update_bot.sh"
+        executable = "/bin/bash" # or "bash" if it's in PATH
+        script_args = [] # No special args needed before the script path for bash
+    else:
+        await ctx.send(f"Unsupported operating system for automatic updates: {current_os}", ephemeral=True)
+        return
+
+    # Construct the path to the update script
+    # Assumes main.py is in 'interactions.py' and the script is one level up.
+    # e.g. /home/container/interactions.py/main.py -> /home/container/update_bot.sh
+    script_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', script_name))
 
     if not os.path.exists(script_path):
         logging.error(f"Update script not found at: {script_path}")
@@ -532,23 +551,23 @@ async def update_bot_command(ctx):
         return
 
     try:
-        logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) initiated bot update using script: {script_path}")
+        logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) initiated bot update using {executable} with script: {script_path}")
         # Using asyncio.create_subprocess_exec for non-blocking execution
+        # Full command: executable *script_args script_path
         process = await asyncio.create_subprocess_exec(
-            'powershell.exe',
-            '-ExecutionPolicy', 'Bypass', # To ensure the script can run
-            '-File', script_path,
+            executable,
+            *script_args, # Unpack arguments like -ExecutionPolicy Bypass -File
+            script_path,  # The script itself is the last argument here
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await process.communicate() # Wait for the script to complete
 
-        response_message = "🚀 **Update Script Execution** 🚀\n"
+        response_message = f"🚀 **Update Script Execution ({current_os.capitalize()})** 🚀\n"
         if process.returncode == 0:
             response_message += "✅ Script executed successfully.\n"
         else:
             response_message += f"⚠️ Script finished with exit code: {process.returncode}.\n"
-
         if stdout:
             response_message += f"**Output:**\n```powershell\n{stdout.decode('utf-8', errors='ignore')[:1500]}\n```\n"
         if stderr:
@@ -557,7 +576,7 @@ async def update_bot_command(ctx):
         await ctx.send(response_message, ephemeral=True)
     except Exception as e:
         logging.error(f"Error executing update script: {e}", exc_info=True)
-        await ctx.send(f"An error occurred while trying to run the update script: {e}", ephemeral=True)
+        await ctx.send(f"An error occurred while trying to run the update script '{script_name}': {e}", ephemeral=True)
 
 # Mention handler
 @bot.event()

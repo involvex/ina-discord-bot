@@ -15,7 +15,8 @@
 #>
 
 # --- Configuration ---
-$BotDirectory = "c:\Users\lukas\Downloads\discordbotpy\interactions.py" # Your bot's local Git repository path
+# $BotDirectory = "c:\Users\lukas\Downloads\discordbotpy\interactions.py" # Original Windows dev path
+$BotDirectory = "/home/container/interactions.py" # Adjusted to reflect server structure, for context. PowerShell script is Windows-specific.
 $GitBranch = "main"
 
 # Optional: Path to your Python executable (if not in PATH or for specific venv)
@@ -75,22 +76,37 @@ Write-Host ""
 # --- Ensure we are on the correct branch ---
 Write-Host "Ensuring you are on the '$GitBranch' branch..."
 try {
-    $currentBranch = git rev-parse --abbrev-ref HEAD
+    # git rev-parse writes the branch name to STDOUT.
+    # We need to capture it and trim any potential whitespace.
+    $currentBranchOutput = git rev-parse --abbrev-ref HEAD
+    if ($LASTEXITCODE -ne 0) {
+        throw "git rev-parse --abbrev-ref HEAD failed with exit code $LASTEXITCODE."
+    }
+    $currentBranch = $currentBranchOutput.Trim()
+
     if ($currentBranch -ne $GitBranch) {
         Write-Host "Currently on branch '$currentBranch'. Attempting to checkout '$GitBranch'..."
-        git checkout $GitBranch -ErrorAction Stop
+        git checkout $GitBranch
+        if ($LASTEXITCODE -ne 0) {
+            throw "git checkout $GitBranch failed with exit code $LASTEXITCODE."
+        }
     }
     Write-Host "Successfully on branch '$GitBranch'."
 }
 catch {
-    Write-Warning "Failed to checkout branch '$GitBranch'. If you are on a different branch, pulling might have unexpected results. Error: $($_.Exception.Message)"
+    # Make this a fatal error as failing to be on the correct branch is critical for an update script
+    Write-Error "Failed to ensure the script is on branch '$GitBranch'. Update cannot proceed safely. Error: $($_.Exception.Message)"
+    exit 1 # Exit the script
 }
 Write-Host ""
 
 # --- Pull changes from the main branch of origin ---
 Write-Host "Pulling changes from origin/$GitBranch..."
 try {
-    git pull origin $GitBranch --progress -ErrorAction Stop
+    git pull origin $GitBranch --progress
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git pull origin $GitBranch --progress failed with exit code $LASTEXITCODE."
+    }
     Write-Host "Successfully pulled latest changes."
 }
 catch {
