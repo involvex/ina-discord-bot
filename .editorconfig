@@ -16,3 +16,11 @@ indent_size = 2
 charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+[*.sh]
+end_of_line = lf
+indent_style = space
+indent_size = 4 # Or 2, adjust to your preference for shell scripts
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
