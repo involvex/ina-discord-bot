@@ -13,6 +13,7 @@ import re
 # import perks # No longer needed for direct data loading
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
 from interactions.models.discord.channel import GuildText # For specific channel type checking
+from interactions.api.events.discord import MessageCreate # Import the event type
 from typing import Optional
 import packaging.version  # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, track_recipe
@@ -101,7 +102,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.67" 
+__version__ = "0.2.68" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -1357,14 +1358,15 @@ SILLY_MENTION_RESPONSES = [
 
 # Mention handler
 @bot.event()
-async def on_message_create(message: Message): # Removed event_name parameter
+async def on_message_create(event: MessageCreate): # Parameter is the event object
     """Handles new messages, specifically for bot mentions."""
-    # The 'message' argument is directly the Message object from the library.
+    message: Message = event.message # Access the actual message from the event object
+
     if not message:
         return
     # Ensure message is a Message object, not a string or other type if dispatch is unexpected
     if not isinstance(message, Message):
-        logging.warning(f"on_message_create received unexpected message type: {type(message)}. Value: {message}")
+        logging.warning(f"on_message_create: Extracted message is not of type Message. Type: {type(message)}. Value: {message}")
         return
 
     author = getattr(message, "author", None)
