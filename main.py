@@ -21,11 +21,11 @@ from bs4 import BeautifulSoup
 import requests
 
 # Load environment variables from .env file
-from interactions.models.discord.channel import TextChannel # Added import
+from interactions import TextChannel # Corrected import for interactions.py v5+
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.2.4" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.5" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
