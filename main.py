@@ -12,7 +12,7 @@ import re
 import items
 import perks
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
-from interactions.models.discord.channel import GuildText, TextChannel # For specific channel type checking
+from interactions.models.discord.channel import GuildText # For specific channel type checking
 from typing import Optional
 import packaging.version  # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.18" 
+__version__ = "0.2.20" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -42,10 +42,8 @@ if not bot_token:
 
 bot = Client(token=bot_token)
 
-BUILDS_FILE = 'saved_builds.json'
-BOT_MANAGERS_FILE = 'bot_managers.json'
-WELCOME_SETTINGS_FILE = 'welcome_settings.json'
-LOGGING_SETTINGS_FILE = 'logging_settings.json'
+BUILDS_FILE = 'saved_builds.json' # Kept separate for user-generated content
+MASTER_SETTINGS_FILE = 'bot_settings.json'
 OWNER_ID = 157968227106947072 # Your Discord User ID
 
 # --- Update Checker Configuration ---
@@ -69,68 +67,78 @@ NEW_WORLD_WELCOME_MESSAGES = [
     "{member_mention} has breached the gates of {guild_name}! Prepare for glory (and maybe some lag).",
 ]
 
-# --- Welcome Message Helper Functions ---
-def load_welcome_settings():
-    """Loads welcome message settings from the JSON file."""
+# --- Master Settings Helper Functions ---
+def load_master_settings():
+    """Loads all settings from the master JSON file. Creates it with defaults if not found."""
     try:
-        with open(WELCOME_SETTINGS_FILE, 'r', encoding='utf-8') as f:
+        with open(MASTER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+        # Return a default structure if file doesn't exist or is invalid
+        default_settings = {
+            "bot_managers": [],
+            "guild_settings": {} # Guild-specific settings will be nested here
+        }
+        save_master_settings(default_settings) # Create the file with defaults
+        return default_settings
 
-# --- Logging Helper Functions ---
-def load_logging_settings():
-    """Loads server activity logging settings from the JSON file."""
-    try:
-        with open(LOGGING_SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
+def save_master_settings(settings_data):
+    """Saves the provided settings data to the master JSON file."""
+    with open(MASTER_SETTINGS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(settings_data, f, indent=4)
 
 
 # --- Bot Manager Helper Functions ---
 def load_bot_managers():
-    """Loads bot manager IDs from the JSON file."""
-    try:
-        with open(BOT_MANAGERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    """Loads bot manager IDs from the master settings file."""
+    settings = load_master_settings()
+    return settings.get("bot_managers", [])
 
 def save_bot_managers(managers_list):
-    """Saves the entire bot managers list to the JSON file."""
-    with open(BOT_MANAGERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(managers_list, f, indent=2)
+    """Saves the bot managers list to the master settings file."""
+    settings = load_master_settings()
+    settings["bot_managers"] = managers_list
+    save_master_settings(settings)
 
+# --- Welcome Message Helper Functions (using master settings) ---
 def save_welcome_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
-    """Saves welcome message settings for a specific guild."""
-    settings = load_welcome_settings()
-    settings[str(guild_id)] = {
+    """Saves welcome message settings for a specific guild in the master settings file."""
+    settings = load_master_settings()
+    guild_id_str = str(guild_id)
+
+    guild_specific_settings = settings.setdefault("guild_settings", {})
+    this_guild_settings = guild_specific_settings.setdefault(guild_id_str, {})
+    
+    this_guild_settings["welcome"] = {
         "enabled": enabled,
         "channel_id": str(channel_id) if channel_id else None
     }
-    with open(WELCOME_SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=4)
+    save_master_settings(settings)
 
 def get_welcome_setting(guild_id: str) -> Optional[dict]:
-    """Gets welcome message settings for a specific guild."""
-    settings = load_welcome_settings()
-    return settings.get(str(guild_id))
+    """Gets welcome message settings for a specific guild from the master settings file."""
+    settings = load_master_settings()
+    return settings.get("guild_settings", {}).get(str(guild_id), {}).get("welcome")
 
+# --- Logging Helper Functions (using master settings) ---
 def save_logging_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
-    """Saves server activity logging settings for a specific guild."""
-    settings = load_logging_settings()
-    settings[str(guild_id)] = {
+    """Saves server activity logging settings for a specific guild in the master settings file."""
+    settings = load_master_settings()
+    guild_id_str = str(guild_id)
+
+    guild_specific_settings = settings.setdefault("guild_settings", {})
+    this_guild_settings = guild_specific_settings.setdefault(guild_id_str, {})
+
+    this_guild_settings["logging"] = {
         "enabled": enabled,
         "channel_id": str(channel_id) if channel_id else None
     }
-    with open(LOGGING_SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=4)
+    save_master_settings(settings)
 
 def get_logging_setting(guild_id: str) -> Optional[dict]:
-    """Gets server activity logging settings for a specific guild."""
-    settings = load_logging_settings()
-    return settings.get(str(guild_id))
+    """Gets server activity logging settings for a specific guild from the master settings file."""
+    settings = load_master_settings()
+    return settings.get("guild_settings", {}).get(str(guild_id), {}).get("logging")
 
 
 def is_bot_manager(user_id: int) -> bool:
