@@ -5,8 +5,7 @@ import logging
 from interactions import slash_command, slash_option, OptionType, Permissions, Embed
 
 from bot_client import bot
-from config import OWNER_ID
-from utils.permissions import load_bot_managers, save_bot_managers
+from config import OWNER_ID # Still needed for updatebot
 
 @slash_command("updatebot", description="Pulls the latest updates from GitHub (Owner only).")
 async def update_bot_command(ctx):
@@ -52,46 +51,3 @@ async def restart_bot_command(ctx):
         ephemeral=True
     )
     await bot.stop()
-
-@slash_command("permit", description="Grants a user bot management permissions (Server Administrator only).", default_member_permissions=Permissions.ADMINISTRATOR)
-@slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
-async def permit_command(ctx, user): # user type is resolved by interactions.py
-    target_user_id = int(user.id)
-    managers = load_bot_managers()
-    if target_user_id in managers:
-        await ctx.send(f"{user.mention} already has bot management permissions.", ephemeral=True)
-        return
-    managers.append(target_user_id)
-    save_bot_managers(managers)
-    logging.info(f"User {ctx.author.user.username} granted bot management to {user.username} ({target_user_id}).")
-    await ctx.send(f"✅ {user.mention} has been granted bot management permissions.", ephemeral=True)
-
-@slash_command("unpermit", description="Revokes bot management permissions (Server Administrator only).", default_member_permissions=Permissions.ADMINISTRATOR)
-@slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
-async def unpermit_command(ctx, user):
-    target_user_id = int(user.id)
-    managers = load_bot_managers()
-    if target_user_id not in managers:
-        await ctx.send(f"{user.mention} does not have bot management permissions.", ephemeral=True)
-        return
-    managers.remove(target_user_id)
-    save_bot_managers(managers)
-    logging.info(f"User {ctx.author.user.username} revoked bot management from {user.username} ({target_user_id}).")
-    await ctx.send(f"✅ {user.mention}'s bot management permissions have been revoked.", ephemeral=True)
-
-@slash_command("listmanagers", description="Lists users with bot management permissions (Server Administrator only).", default_member_permissions=Permissions.ADMINISTRATOR)
-async def listmanagers_command(ctx):
-    managers = load_bot_managers()
-    if not managers:
-        await ctx.send("No designated bot managers (besides the Bot Owner).", ephemeral=True)
-        return
-    embed = Embed(title="👑 Bot Managers", color=0xFFD700)
-    manager_mentions = []
-    for user_id in managers:
-        try:
-            user_obj = await bot.fetch_user(user_id)
-            manager_mentions.append(f"{user_obj.mention} (`{user_obj.username}` - ID: `{user_id}`)")
-        except Exception: manager_mentions.append(f"<@{user_id}> (ID: `{user_id}` - Error fetching details)")
-    embed.description = "\n".join(manager_mentions)
-    embed.set_footer(text=f"The Bot Owner (<@{OWNER_ID}>) always has full permissions.")
-    await ctx.send(embeds=embed, ephemeral=True)

@@ -30,10 +30,12 @@ async def help_command(ctx, command: Optional[str] = None):
         "perk": "Look up information about a specific New World perk.",
         "about": "Show information about Ina's New World Bot.",
         "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
-        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission).",
-        "permit": "Grants a user bot management permissions (Server Administrator only).",
-        "unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
-        "listmanagers": "Lists users with bot management permissions (Server Administrator only)."
+        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission).", # Stays in admin
+        "settings welcome toggle": "Enable or disable welcome messages.",
+        "settings welcome channel": "Set the channel for welcome messages.",
+        "settings permit": "Grants a user bot management permissions (Server Administrator only).",
+        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
+        "settings listmanagers": "Lists users with bot management permissions (Server Administrator only)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}")

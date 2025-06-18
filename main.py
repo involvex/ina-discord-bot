@@ -24,7 +24,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.2.3" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.4" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -50,37 +50,6 @@ GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Periodic check interval (e.g., every 6 hours)
 
-
-# --- Bot Manager Permission Helpers ---
-def load_bot_managers() -> list[int]:
-    """Loads the list of bot manager user IDs from the JSON file."""
-    try:
-        with open(BOT_MANAGERS_FILE, 'r', encoding='utf-8') as f:
-            manager_ids = json.load(f)
-            if isinstance(manager_ids, list) and all(isinstance(uid, int) for uid in manager_ids):
-                return manager_ids
-            logging.warning(f"Corrupted data in {BOT_MANAGERS_FILE}. Expected list of ints.")
-            return []
-    except FileNotFoundError:
-        return []
-    except json.JSONDecodeError:
-        logging.error(f"Error decoding JSON from {BOT_MANAGERS_FILE}. Returning empty list.")
-        return []
-
-def save_bot_managers(manager_ids: list[int]):
-    """Saves the list of bot manager user IDs to the JSON file."""
-    try:
-        with open(BOT_MANAGERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(manager_ids, f, indent=2)
-    except IOError as e:
-        logging.error(f"Error writing to {BOT_MANAGERS_FILE}: {e}")
-
-def is_bot_manager(user_id: int) -> bool:
-    """Checks if a user is a designated bot manager or the bot owner."""
-    if user_id == OWNER_ID: # Bot owner always has permissions
-        return True
-    return user_id in load_bot_managers()
-
 @slash_command("ping", description="Check if the bot is online.")
 async def ping(ctx):
     latency_ms = round(bot.latency * 1000)
@@ -104,10 +73,10 @@ async def help_command(ctx, command: Optional[str] = None):
         "perk": "Look up information about a specific New World perk.",
         "about": "Show information about Ina's New World Bot.",
         "updatebot": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
-        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission).",
-        "permit": "Grants a user bot management permissions (Server Administrator only).",
-        "unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
-        "listmanagers": "Lists users with bot management permissions (Server Administrator only)."
+        "restartbot": "Requests the bot to shut down for a manual restart (requires 'Manage Server' permission).", # Keep in admin cog
+        "settings permit": "Grants a user bot management permissions (Server Administrator only).",
+        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator only).",
+        "settings listmanagers": "Lists users with bot management permissions (Server Administrator only)."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -695,73 +664,6 @@ async def restart_bot_command(ctx):
     # Note: This stops the Python script. An external process manager (systemd, PM2, Docker, etc.)
     # or a wrapper script is needed to actually restart the bot process.
     await bot.stop()
-
-@slash_command(
-    "permit",
-    description="Grants a user bot management permissions (Server Administrator only).",
-    default_member_permissions=Permissions.ADMINISTRATOR
-)
-@slash_option("user", "The user to grant bot management permissions to.", opt_type=OptionType.USER, required=True)
-async def permit_command(ctx, user: User):
-    target_user_id = int(user.id)
-    managers = load_bot_managers()
-
-    if target_user_id in managers:
-        await ctx.send(f"{user.mention} already has bot management permissions.", ephemeral=True)
-        return
-
-    managers.append(target_user_id)
-    save_bot_managers(managers)
-    logging.info(f"User {ctx.author.username} ({ctx.author.id}) granted bot management permission to {user.username} ({target_user_id}).")
-    await ctx.send(f"✅ {user.mention} has been granted bot management permissions.", ephemeral=True)
-
-@slash_command(
-    "unpermit",
-    description="Revokes a user's bot management permissions (Server Administrator only).",
-    default_member_permissions=Permissions.ADMINISTRATOR
-)
-@slash_option("user", "The user to revoke bot management permissions from.", opt_type=OptionType.USER, required=True)
-async def unpermit_command(ctx, user: User):
-    target_user_id = int(user.id)
-    managers = load_bot_managers()
-
-    if target_user_id not in managers:
-        await ctx.send(f"{user.mention} does not have bot management permissions.", ephemeral=True)
-        return
-
-    managers.remove(target_user_id)
-    save_bot_managers(managers)
-    logging.info(f"User {ctx.author.username} ({ctx.author.id}) revoked bot management permission from {user.username} ({target_user_id}).")
-    await ctx.send(f"✅ {user.mention}'s bot management permissions have been revoked.", ephemeral=True)
-
-@slash_command(
-    "listmanagers",
-    description="Lists users with bot management permissions (Server Administrator only).",
-    default_member_permissions=Permissions.ADMINISTRATOR
-)
-async def listmanagers_command(ctx):
-    managers = load_bot_managers()
-    if not managers:
-        await ctx.send("There are no designated bot managers (besides the Bot Owner).", ephemeral=True)
-        return
-
-    embed = Embed(title="👑 Bot Managers", color=0xFFD700) # Gold color
-    
-    manager_mentions = []
-    for user_id in managers:
-        try:
-            # Attempt to fetch user to get their current name and discriminator
-            user_obj = await bot.fetch_user(user_id)
-            if user_obj:
-                manager_mentions.append(f"{user_obj.mention} (`{user_obj.username}#{user_obj.discriminator}` - ID: `{user_id}`)")
-            else:
-                manager_mentions.append(f"<@{user_id}> (ID: `{user_id}` - Could not fetch full user details)")
-        except Exception:
-            manager_mentions.append(f"<@{user_id}> (ID: `{user_id}` - Error fetching user details)")
-            
-    embed.description = "\n".join(manager_mentions)
-    embed.set_footer(text=f"The Bot Owner (<@{OWNER_ID}>) always has full permissions.")
-    await ctx.send(embeds=embed, ephemeral=True)
 
 SILLY_MENTION_RESPONSES = [
     "Did someone say my name? Or was it just the wind in Aeternum?",
