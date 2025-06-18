@@ -5,15 +5,14 @@ import os
 import requests
 from io import StringIO
 import json # For serializing ingredients
-
-# Attempt to import RECIPES from your recipes module
-from recipes import RECIPES # Assuming RECIPES is a dict in recipes.py
+ # The RECIPES dictionary is no longer imported from recipes.py as it's not defined there.
+# The recipes table will be created, but populated by other means or remain available for future population.
 
 DB_NAME = "new_world_data.db"
 # Define your CSV sources
 CSV_SOURCES = {
     "items": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv",
-    "perks": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks.csv", # Assuming a similar URL for perks
+    "perks": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks_scraped.csv", # Updated to the scraped and enhanced CSV
     # Add other CSVs if needed
 }
 
@@ -47,28 +46,22 @@ def populate_db():
                     print(f"Error processing CSV for table '{table_name}': {e}")
 
         # Populate recipes table from the RECIPES dictionary
-        print("Populating 'recipes' table...")
+        print("Ensuring 'recipes' table exists...")
         cursor = conn.cursor()
         try:
             cursor.execute("""
             CREATE TABLE IF NOT EXISTS recipes (
                 output_item_name TEXT PRIMARY KEY,
-                station TEXT,
-                skill TEXT,
-                skill_level INTEGER,
-                tier INTEGER,
-                ingredients TEXT,
-                raw_recipe_data TEXT 
+                station TEXT,          -- Crafting station used
+                skill TEXT,            -- Tradeskill involved (e.g., Weaponsmithing)
+                skill_level INTEGER,   -- Required skill level
+                tier INTEGER,          -- Tier of the crafted item or recipe
+                ingredients TEXT,      -- JSON string of direct ingredients (quantity, item_name)
+                raw_recipe_data TEXT   -- JSON string of the complete recipe data for flexible use
             )
             """)
-            for recipe_name_key, recipe_data in RECIPES.items():
-                # Ensure ingredients are stored as a JSON string
-                ingredients_json = json.dumps(recipe_data.get("ingredients", []))
-                raw_data_json = json.dumps(recipe_data) # Store the whole recipe for flexibility
-                cursor.execute("INSERT OR REPLACE INTO recipes (output_item_name, station, skill, skill_level, tier, ingredients, raw_recipe_data) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                               (recipe_data.get("output_item_name", recipe_name_key), recipe_data.get("station"), recipe_data.get("skill"), recipe_data.get("skill_level"), recipe_data.get("tier"), ingredients_json, raw_data_json))
             conn.commit()
-            print(f"Successfully loaded {len(RECIPES)} recipes into 'recipes' table.")
+            print(f"Table 'recipes' created or already exists. It will be populated if a dedicated recipe data source is provided or remains available for other mechanisms.")
         except Exception as e:
             print(f"Error populating 'recipes' table: {e}")
     finally:
