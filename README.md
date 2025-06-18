@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/involvex/ina-discord-bot-">
-    <img src="docs/src/images/logo.png" alt="Ina's New World Bot Logo" width="150"/>
+    <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/docs/src/images/logo.png" alt="Ina's New World Bot Logo" width="150"/>
   </a>
 </p>
 
@@ -24,7 +24,6 @@
 *   **Build Management:** Save, share, and manage your favorite New World builds from `nw-buddy.de`. (e.g., `<code>/build add</code>`, `<code>/build list</code>`)
 *   **Server Enhancements:** Enhance your server with optional welcome messages for new members and activity logging.
 *   **Aeternum Fun:** Engage with fun commands, including the legendary `<code>/petpet</code>` ritual and more!
-*   **AI-Powered Assistance:** Get tips, lore, and answers to your New World questions with Gemini AI integration.
 *   **Bot Administration:** Tools for bot owners and administrators to manage the bot, including permissions and updates.
 *   **Automatic Updates:** Configure Ina to check for and apply updates to herself (requires specific server-side setup).
 *   **Always Evolving:** Regularly updated with new features, improvements, and the latest New World game data.
