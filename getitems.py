@@ -3,22 +3,29 @@ import csv
 import os
 import logging
 from typing import Dict, Optional
+import requests # For fetching from URL
+import io # For reading string as file
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+ITEMS_CSV_URL = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv"
+
 def get_item_database() -> Dict[str, Dict[str, str]]:
     """
-    Reads items from CSV file and returns a dictionary of item data.
+    Reads items from a remote CSV file (GitHub) and returns a dictionary of item data.
     Returns a dictionary with item names as keys and item data as values.
     """
     items_db = {}
-    # Robust path, assuming items.csv is in the same directory as getitems.py
-    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'items.csv')
 
     try:
-        with open(csv_path, 'r', encoding='utf-8', newline='') as file:
+        response = requests.get(ITEMS_CSV_URL, timeout=15)
+        response.raise_for_status() # Raise an exception for HTTP errors
+        
+        # Use io.StringIO to treat the CSV string content as a file
+        csv_content = response.text
+        with io.StringIO(csv_content) as file:
             reader = csv.DictReader(file)
             
             if not reader.fieldnames:
@@ -34,10 +41,10 @@ def get_item_database() -> Dict[str, Dict[str, str]]:
                     break
 
             if not item_name_col_actual:
-                logger.error(f"Could not find a suitable item name column (e.g., 'Name', 'name') in CSV headers: {reader.fieldnames} in file {csv_path}")
+                logger.error(f"Could not find a suitable item name column (e.g., 'Name', 'name') in CSV headers: {reader.fieldnames} from URL {ITEMS_CSV_URL}")
                 return {}
 
-            logger.info(f"Using '{item_name_col_actual}' as the name column from '{csv_path}'.")
+            logger.info(f"Using '{item_name_col_actual}' as the name column from remote CSV.")
 
             for row_idx, row in enumerate(reader, 1):
                 raw_item_name = row.get(item_name_col_actual)
@@ -60,12 +67,15 @@ def get_item_database() -> Dict[str, Dict[str, str]]:
                     'type': row.get('Item Type Name', '')     # From CSV sample
                     # Add other fields if necessary for getitems.py's purpose
                 }
-            logger.info(f"Loaded {len(items_db)} items from '{csv_path}' using get_item_database.")
-    except FileNotFoundError:
-        logger.error(f"Items database file not found: {csv_path}. This function does not create it.")
+            logger.info(f"Loaded {len(items_db)} items from '{ITEMS_CSV_URL}' using get_item_database.")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching items CSV from URL '{ITEMS_CSV_URL}': {e}")
+        return {}
+    except csv.Error as e:
+        logger.error(f"Error parsing CSV data from '{ITEMS_CSV_URL}': {e}")
         return {}
     except Exception as e:
-        logger.error(f"Error reading items database from '{csv_path}': {e}", exc_info=True)
+        logger.error(f"Unexpected error reading items database from '{ITEMS_CSV_URL}': {e}", exc_info=True)
         return {}
 
     return items_db
@@ -74,44 +84,13 @@ def add_item(item_data: Dict[str, str]) -> bool:
     """
     Adds a new item to the CSV database.
     Uses 'Name' from item_data for the item's identity.
-    Writes a predefined set of columns if creating a new file.
-    WARN: This function is simplified for complex CSVs. It may not preserve all columns.
+    WARN: This function is NOT SUPPORTED when loading items from a remote URL.
+    It is designed for local CSV files.
     Returns True if successful, False otherwise.
     """
-    csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'items.csv')
-    
-    # Define the headers this function knows how to write, based on sample.
-    writable_headers = ['Name', 'Item ID', 'Description', 'Rarity', 'Item Type Name']
-
-    item_name_to_add = item_data.get('Name')
-    if not item_name_to_add:
-        logger.error("Item data must include a 'Name' field with a non-empty value.")
-        return False
-
-    file_exists = os.path.isfile(csv_path)
-    is_file_empty = not file_exists or os.path.getsize(csv_path) == 0
-
-    try:
-        if file_exists and not is_file_empty:
-            existing_items = get_item_database() # Uses corrected name detection
-            if item_name_to_add.lower() in existing_items:
-                logger.warning(f"Item '{item_name_to_add}' already exists in database. Not adding.")
-                return False
-            
-        with open(csv_path, 'a', encoding='utf-8', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=writable_headers)
-            
-            if is_file_empty:
-                writer.writeheader()
-            
-            row_to_write = {header: item_data.get(header, '') for header in writable_headers}
-            writer.writerow(row_to_write)
-            
-            logger.info(f"Successfully added/appended item: '{item_name_to_add}' to '{csv_path}'. Only columns {writable_headers} were processed.")
-        return True
-    except Exception as e:
-        logger.error(f"Error adding item '{item_name_to_add}' to database '{csv_path}': {e}", exc_info=True)
-        return False
+    logger.error("add_item is not supported when items.csv is loaded from a remote URL. "
+                   "This function requires a local, writable CSV file.")
+    return False
 
 def get_item(item_name: str) -> Optional[Dict[str, str]]:
     """

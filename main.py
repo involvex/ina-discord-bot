@@ -1503,17 +1503,19 @@ def load_all_game_data():
     global ITEM_DATA, ALL_PERKS_DATA, ITEM_ID_TO_NAME_MAP
     logging.info("Starting to load game data...")
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    items_csv_path = os.path.join(script_dir, 'items.csv')
-    perks_csv_path = os.path.join(script_dir, 'perks.csv') # Assuming perks.csv is in the same directory
+    # Define remote URLs for data files
+    items_csv_source = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv"
+    # Assuming perks.csv is also hosted, replace with its actual URL or keep local path if necessary
+    perks_csv_source = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks.csv" # Placeholder URL
+    # perks_csv_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'perks.csv') # If perks.csv remains local
 
-    ITEM_DATA = items.load_items_from_csv(items_csv_path)
+    ITEM_DATA = items.load_items_from_csv(items_csv_source)
     if not ITEM_DATA:
-        logging.error(f"CRITICAL: Failed to load item_data from {items_csv_path}! Item-related commands will fail.")
+        logging.error(f"CRITICAL: Failed to load item_data from {items_csv_source}! Item-related commands will fail.")
         ITEM_DATA = {} # Ensure it's an empty dict if loading fails
         ITEM_ID_TO_NAME_MAP = {}
     else:
-        logging.info(f"Successfully loaded {len(ITEM_DATA)} items from {items_csv_path}.")
+        logging.info(f"Successfully loaded {len(ITEM_DATA)} items from {items_csv_source}.")
         # Populate ITEM_ID_TO_NAME_MAP
         ITEM_ID_TO_NAME_MAP = {
             row.get('Item ID'): row.get('Name') # Assuming 'Name' is the original cased name column
@@ -1522,12 +1524,12 @@ def load_all_game_data():
         }
         logging.info(f"Successfully created ITEM_ID_TO_NAME_MAP with {len(ITEM_ID_TO_NAME_MAP)} entries.")
 
-    ALL_PERKS_DATA = perks.load_perks_from_csv(perks_csv_path) # Pass the path for consistency
+    ALL_PERKS_DATA = perks.load_perks_from_csv(perks_csv_source) # Pass the source (URL or path)
     if not ALL_PERKS_DATA:
-        logging.error(f"CRITICAL: Failed to load all_perks_data from {perks_csv_path}! Perk-related commands will fail.")
+        logging.error(f"CRITICAL: Failed to load all_perks_data from {perks_csv_source}! Perk-related commands will fail.")
         ALL_PERKS_DATA = {} # Ensure it's an empty dict
     else:
-        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks from {perks_csv_path}.")
+        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks from {perks_csv_source}.")
     logging.info("Game data loading process complete.")
 
 @bot.event()
