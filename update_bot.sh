@@ -48,9 +48,9 @@ fi
 
 # Remove untracked files and directories, including those in .gitignore
 # Use with caution: -x also removes ignored files. If you don't want that, remove the 'x'.
-git clean -fdx
+git clean -fd # Changed -fdx to -fd to preserve ignored files like .env
 if [ $? -ne 0 ]; then
-  echo "Error: git clean -fdx failed."
+  echo "Error: git clean -fd failed."
   exit 1
 fi
 

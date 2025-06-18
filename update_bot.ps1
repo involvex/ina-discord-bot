@@ -53,9 +53,9 @@ if ($LASTEXITCODE -ne 0) {
 
 # Remove untracked files and directories, including those in .gitignore
 # Use with caution: -x also removes ignored files. If you don't want that, remove the 'x'.
-git clean -fdx
+git clean -fd # Changed -fdx to -fd to preserve ignored files like .env
 if ($LASTEXITCODE -ne 0) {
-  Write-Error "Error: git clean -fdx failed."
+  Write-Error "Error: git clean -fd failed."
   exit 1
 }
 

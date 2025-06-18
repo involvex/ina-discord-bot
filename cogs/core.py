@@ -15,6 +15,10 @@ from config import (
     GITHUB_VERSION_FILE_URL,
     UPDATE_CHECK_INTERVAL_SECONDS
 )
+from interactions import TextChannel # For type checking channel
+from interactions.api import events # For GuildMemberAdd event type
+from utils.settings_manager import get_guild_setting
+from config import NEW_WORLD_WELCOME_MESSAGES
 
 async def rotate_funny_presence(client_instance, interval=60):
     await client_instance.wait_until_ready()
@@ -85,3 +89,38 @@ async def on_message_create(event): # Renamed 'message' to 'event' for clarity w
     if bot_id_str in mentioned_ids or f"<@{bot_id_str}>" in content or f"<@!{bot_id_str}>" in content:
         if hasattr(message_obj, "channel") and hasattr(message_obj.channel, "send"): # Check if channel object exists and has send
             await message_obj.channel.send("👋 The winds of Aeternum greet you! Use `/help` to see my commands.")
+
+@bot.event(name="on_guild_member_add")
+async def on_member_join_event(event: events.GuildMemberAdd):
+    member = event.member
+    if not member.guild:
+        return
+
+    guild_id_str = str(member.guild.id)
+    current_logger = logging.getLogger(__name__) # Use a logger instance
+
+    current_logger.info(f"Member {member.username} ({member.id}) joined guild {member.guild.name} ({guild_id_str})")
+
+    is_enabled = get_guild_setting(guild_id_str, "welcome_enabled", False)
+    channel_id_str = get_guild_setting(guild_id_str, "welcome_channel_id")
+
+    if is_enabled and channel_id_str:
+        try:
+            channel_id = int(channel_id_str)
+            target_channel = await bot.fetch_channel(channel_id)
+
+            if target_channel and isinstance(target_channel, TextChannel):
+                welcome_message_template = random.choice(NEW_WORLD_WELCOME_MESSAGES)
+                formatted_message = welcome_message_template.format(mention=member.mention)
+                await target_channel.send(formatted_message)
+                current_logger.info(f"Sent welcome message to {member.username} in {target_channel.name} for guild {guild_id_str}")
+            elif target_channel:
+                current_logger.warning(f"Welcome channel {channel_id_str} for guild {guild_id_str} is not a text channel.")
+            else:
+                current_logger.warning(f"Could not fetch welcome channel {channel_id_str} for guild {guild_id_str}.")
+        except ValueError:
+            current_logger.error(f"Invalid channel ID format '{channel_id_str}' for guild {guild_id_str}.")
+        except Exception as e:
+            current_logger.error(f"Error sending welcome message for guild {guild_id_str}: {e}", exc_info=True)
+    elif is_enabled: # No channel set
+        current_logger.info(f"Welcome messages enabled for guild {guild_id_str} but no channel is set.")
