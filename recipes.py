@@ -15,20 +15,6 @@ def slugify_recipe_name(name: str) -> str:
 
 
 def fetch_recipe_from_nwdb(item_name: str):
-    # Special case for Gorgonite Amulet
-    if item_name.lower() in ["gorgonite amulet", "gorgon's amulet"]:
-        return {
-            'station': 'Outfitting Station',
-            'skill': 'Jewelcrafting',
-            'skill_level': 250,
-            'tier': 5,
-            'ingredients': [
-                {'item': "Gorgon's Eye", 'quantity': 1},
-                {'item': 'Prismatic Chain', 'quantity': 1},
-                {'item': 'Prismatic Setting', 'quantity': 1},
-                {'item': 'Prismatic Ingot', 'quantity': 6},
-            ]
-        }
     slug = slugify_recipe_name(item_name)
     url = f'https://nwdb.info/db/recipe/{slug}'
     try:
@@ -92,20 +78,33 @@ RECIPES = {
             {"item": "Iron Ore", "quantity": 4}
         ]
     },
-    # ... add more recipes as needed ...
+    "gorgonite amulet": {
+        "station": "Outfitting Station",
+        "skill": "Jewelcrafting",
+        "skill_level": 250,
+        "tier": 5,
+        "ingredients": [
+            {"item": "Gorgon's Eye", "quantity": 1},
+            {"item": "Prismatic Chain", "quantity": 1},
+            {"item": "Prismatic Setting", "quantity": 1},
+            {"item": "Prismatic Ingot", "quantity": 6},
+        ]
+    },
+    # ... other recipes ...
 }
 
+# Add aliases after RECIPES is fully defined
+RECIPES["gorgon's amulet"] = RECIPES["gorgonite amulet"]
 
-def get_recipe(item_name: str):
+def get_recipe(item_name: str, global_item_data: dict):
     # Try local recipes first
     recipe = RECIPES.get(item_name.lower())
     if recipe:
         return recipe
     # Try to get from items.csv if it has a recipe
-    import items
-    item_data = items.load_items_from_csv('items.csv')
-    if item_data and item_name.lower() in item_data:
-        row = item_data[item_name.lower()]
+    # Use the globally loaded item_data passed as an argument
+    if global_item_data and item_name.lower() in global_item_data:
+        row = global_item_data[item_name.lower()]
         # Try to extract recipe info if present
         if 'Crafting Recipe' in row and row['Crafting Recipe']:
             # This is a placeholder: you may need to parse the recipe string or link to a recipe id
@@ -119,9 +118,8 @@ def get_recipe(item_name: str):
     return None
 
 
-def calculate_crafting_materials(item_name: str, quantity: int = 1, include_intermediate: bool = False):
-    # Dummy implementation for compatibility
-    recipe = get_recipe(item_name)
+def calculate_crafting_materials(item_name: str, global_item_data: dict, quantity: int = 1, include_intermediate: bool = False):
+    recipe = get_recipe(item_name, global_item_data)
     if not recipe:
         return None
     materials = {}
