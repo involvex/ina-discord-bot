@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 import requests
 
 # Load environment variables from .env file
-#from interactions.models import TextChannel # Adjusted import for TextChannel
+from interactions.models import TextChannel # Adjusted import for TextChannel
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -732,14 +732,16 @@ async def restart_bot_command(ctx):
     await bot.stop()
 
 # --- Settings Commands ---
-settings_cmd = bot.create_group(
-    name="settings",
-    description="Manage bot settings (requires permissions).",
-)
+@slash_command(name="settings", description="Manage bot settings (requires permissions).")
+async def settings(ctx: SlashContext):
+    """Base command for settings. Discord will typically show subcommands."""
+    # This function body can be left empty or provide a generic help message
+    # if called directly, though usually users will invoke subcommands.
+    pass
 
-@settings_cmd.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
+@settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
-async def settings_permit(ctx: SlashContext, user: User):
+async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed to avoid conflict if settings was a class
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
         await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
         return
@@ -749,9 +751,9 @@ async def settings_permit(ctx: SlashContext, user: User):
     else:
         await ctx.send(f"ℹ️ {user.mention} already has bot management permissions.", ephemeral=True)
 
-@settings_cmd.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
+@settings.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
 @slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
-async def settings_unpermit(ctx: SlashContext, user: User):
+async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
         await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
         return
@@ -765,8 +767,8 @@ async def settings_unpermit(ctx: SlashContext, user: User):
     else:
         await ctx.send(f"ℹ️ {user.mention} does not have bot management permissions.", ephemeral=True)
 
-@settings_cmd.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
-async def settings_listmanagers(ctx: SlashContext):
+@settings.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
+async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR):
         await ctx.send("You need Administrator permissions to use this command.", ephemeral=True)
         return
