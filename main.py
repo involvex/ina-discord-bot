@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.98" 
+__version__ = "0.2.99" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -948,8 +948,10 @@ def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
     Example: expr_str = "0.024 * perkMultiplier", gs_multiplier_val = 1.45 (for GS 725 from base 500)
     """
     try:
-        # Replace perkMultiplier with its numeric value
-        eval_str = expr_str.replace("perkMultiplier", str(gs_multiplier_val))
+        # Replace perkMultiplier (and {perkMultiplier} if it appears with braces) with its numeric value
+        eval_str = expr_str.replace("{perkMultiplier}", str(gs_multiplier_val)) # Handle if braces are part of the expression
+        eval_str = eval_str.replace("perkMultiplier", str(gs_multiplier_val))   # Handle if no braces
+
 
         # Define a safe environment for eval
         allowed_globals = {"__builtins__": {}}
