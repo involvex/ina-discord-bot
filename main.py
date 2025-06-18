@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.43" 
+__version__ = "0.2.45" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -181,26 +181,27 @@ async def ping(ctx):
 @slash_option("command", "Get detailed help for a specific command", opt_type=OptionType.STRING, required=False)
 async def help_command(ctx, command: Optional[str] = None):
     # Using a more structured dictionary for command information
+    # Adding a 'category' field for better organization in the full help embed
     commands_info = {
-        "ping": {"desc": "Check if the bot is online.", "usage": "/ping"},
-        "help": {"desc": "Show available commands or help for a specific command.", "usage": "/help [command_name]"},
-        "petpet": {"desc": "Give a New World petting ritual to a user!", "usage": "/petpet <user>"},
-        "calculate": {"desc": "Perform a calculation with New World magic!", "usage": "/calculate <expression>"},
-        "nwdb": {"desc": "Look up items from New World Database.", "usage": "/nwdb <item_name>"},
-        "calculate_craft": {"desc": "Calculate resources needed to craft an item, including intermediates.", "usage": "/calculate_craft <item_name> [amount]"},
-        "recipe": {"desc": "Show the full recipe breakdown for a craftable item.", "usage": "/recipe <item_name>"},
-        "build add": {"desc": "Add a build from nw-buddy.de.", "usage": "/build add <link> <name> [keyperks]"},
-        "build list": {"desc": "Show a list of saved builds.", "usage": "/build list"},
-        "build remove": {"desc": "Remove a saved build.", "usage": "/build remove <name>", "perms": "Manage Server or Bot Manager"},
-        "perk": {"desc": "Look up information about a specific New World perk.", "usage": "/perk <perk_name>"},
-        "about": {"desc": "Show information about Ina's New World Bot.", "usage": "/about"},
-        "manage update": {"desc": "Pulls updates from GitHub and restarts the bot.", "usage": "/manage update", "perms": "Bot Owner"},
-        "manage restart": {"desc": "Shuts down the bot for manual restart.", "usage": "/manage restart", "perms": "Bot Owner/Manager"},
-        "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner"},
-        "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner"},
-        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner"},
-        "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Manage Server or Bot Manager/Owner"},
-        "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Manage Server or Bot Manager/Owner"}
+        "ping": {"desc": "Check if the bot is online.", "usage": "/ping", "category": "General"},
+        "help": {"desc": "Show available commands or help for a specific command.", "usage": "/help [command_name]", "category": "General"},
+        "petpet": {"desc": "Give a New World petting ritual to a user!", "usage": "/petpet <user>", "category": "General"},
+        "calculate": {"desc": "Perform a calculation with New World magic!", "usage": "/calculate <expression>", "category": "General"},
+        "about": {"desc": "Show information about Ina's New World Bot.", "usage": "/about", "category": "General"},
+        "nwdb": {"desc": "Look up items from New World Database.", "usage": "/nwdb <item_name>", "category": "New World"},
+        "perk": {"desc": "Look up information about a specific New World perk.", "usage": "/perk <perk_name>", "category": "New World"},
+        "recipe": {"desc": "Show the full recipe breakdown for a craftable item.", "usage": "/recipe <item_name>", "category": "New World"},
+        "calculate_craft": {"desc": "Calculate resources needed to craft an item, including intermediates.", "usage": "/calculate_craft <item_name> [amount]", "category": "New World"},
+        "build add": {"desc": "Add a build from nw-buddy.de.", "usage": "/build add <link> <name> [keyperks]", "category": "Builds"},
+        "build list": {"desc": "Show a list of saved builds.", "usage": "/build list", "category": "Builds"},
+        "build remove": {"desc": "Remove a saved build.", "usage": "/build remove <name>", "perms": "Manage Server or Bot Manager", "category": "Builds"},
+        "manage update": {"desc": "Pulls updates from GitHub and restarts the bot.", "usage": "/manage update", "perms": "Bot Owner", "category": "Management"},
+        "manage restart": {"desc": "Shuts down the bot for manual restart.", "usage": "/manage restart", "perms": "Bot Owner/Manager", "category": "Management"},
+        "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
+        "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
+        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
+        "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
+        "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}
     }
 
     if command:
@@ -209,55 +210,72 @@ async def help_command(ctx, command: Optional[str] = None):
 
         if info_to_display:
             usage = info_to_display['usage']
-            desc = info_to_display['desc']
-            perms = f"\nPermissions: {info_to_display['perms']}" if 'perms' in info_to_display else ""
-            await ctx.send(f"**{usage}**\n{desc}{perms}")
+            description = info_to_display['desc']
+            permissions = info_to_display.get('perms')
+
+            embed = Embed(title=f"Help: `{usage}`", color=0x7289DA) # Discord Blurple
+            embed.description = description
+            if permissions:
+                embed.add_field(name="Permissions Required", value=permissions, inline=False)
+            await ctx.send(embeds=embed)
         else:
             # Try to find commands that start with the input, for base commands like /build
             matching_commands_details = []
             for cmd_key, cmd_info in commands_info.items():
                 if cmd_key.startswith(command_name_lookup):
-                    usage = cmd_info['usage']
-                    desc = cmd_info['desc']
-                    perms_note = f" ({cmd_info['perms']})" if 'perms' in cmd_info else ""
-                    matching_commands_details.append(f"**{usage}**: {desc}{perms_note}")
+                    matching_commands_details.append(f"`{cmd_info['usage']}`: {cmd_info['desc']}")
             
             if matching_commands_details:
-                response = f"Help for commands starting with '{command_name_lookup}':\n\n" + "\n\n".join(matching_commands_details)
-                # Discord message limit is 2000 characters
-                if len(response) > 1950: # Leave some buffer
-                    response = response[:1900] + "\n... (too many matches to display fully)"
-                await ctx.send(response)
+                embed = Embed(title=f"Commands starting with '{command_name_lookup}'", color=0x7289DA)
+                embed.description = "\n".join(matching_commands_details)
+                await ctx.send(embeds=embed)
             else:
                 await ctx.send(f"Command '{command}' not found. Use `/help` to see all commands.")
     else:
-        page_contents = []
-        current_page_text = "**Ina's New World Bot Commands:**\n\n"
-
+        # Group commands by category
+        categorized_commands = {}
         for cmd_key, info in commands_info.items():
-            usage = info['usage']
-            desc = info['desc']
-            perms_note = f" ({info['perms']})" if 'perms' in info else ""
-            line = f"**{usage}**: {desc}{perms_note}\n\n" # Add double newline for better spacing
+            category = info.get("category", "Uncategorized")
+            if category not in categorized_commands:
+                categorized_commands[category] = []
+            categorized_commands[category].append(f"`{info['usage']}`: {info['desc']}")
 
-            if len(current_page_text) + len(line) > 1950: # Discord message limit is 2000, keep some buffer
-                page_contents.append(current_page_text.strip())
-                current_page_text = line # Start new page with the current line
-            else:
-                current_page_text += line
+        embeds_to_send = []
+        current_embed = Embed(title="Ina's New World Bot Commands", color=0x5865F2) # A nice blue
+        current_embed.description = "Here's a list of available commands. For more details on a specific command, use `/help [command_name]`."
+        char_count = len(current_embed.title) + len(current_embed.description or "")
+
+        # Define a preferred order for categories
+        category_order = ["General", "New World", "Builds", "Settings", "Management", "Uncategorized"]
+
+        for category_name in category_order:
+            if category_name in categorized_commands:
+                commands_in_category = categorized_commands[category_name]
+                field_value = "\n".join(commands_in_category)
+                field_name = f"**{category_name}**"
+
+                # Discord embed field value limit is 1024, total embed char limit is ~6000
+                # Max 25 fields per embed
+                if char_count + len(field_name) + len(field_value) > 5500 or len(current_embed.fields) >= 24:
+                    embeds_to_send.append(current_embed)
+                    current_embed = Embed(title="Ina's New World Bot Commands (Continued)", color=0x5865F2)
+                    char_count = len(current_embed.title)
+                
+                current_embed.add_field(name=field_name, value=field_value, inline=False)
+                char_count += len(field_name) + len(field_value)
         
-        if current_page_text.strip(): # Add the last page if it has content
-            page_contents.append(current_page_text.strip())
+        if current_embed.fields: # Add the last embed if it has fields
+            embeds_to_send.append(current_embed)
 
-        if not page_contents or (len(page_contents) == 1 and page_contents[0] == "**Ina's New World Bot Commands:**"):
+        if not embeds_to_send:
             await ctx.send("No commands to display.", ephemeral=True)
             return
 
-        for i, page_text_content in enumerate(page_contents):
+        for i, embed_to_send in enumerate(embeds_to_send):
             if i == 0:
-                await ctx.send(page_text_content)
+                await ctx.send(embeds=embed_to_send)
             else:
-                await ctx.followup.send(page_text_content) # Use followup for subsequent messages
+                await ctx.followup.send(embeds=embed_to_send) # Use followup for subsequent messages
 
 
 @slash_command("petpet", description="Give a New World petting ritual to a user!")
