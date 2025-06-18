@@ -11,7 +11,7 @@ import unicodedata
 import re
 import items
 import perks # Import the new perks module
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, TextChannel, SlashContext
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext
 from typing import Optional
 import packaging.version # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
