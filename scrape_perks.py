@@ -33,8 +33,69 @@ def sanitize_json_description(description_text):
     return description_text.strip()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
+def scrape_individual_perk_html(perk_id: str, perk_name_for_log: str) -> dict:
+    """
+    Fetches and parses the individual HTML page for a perk to get additional details.
+    Returns a dictionary with any found details.
+    """
+    html_details = {}
+    perk_url = f"{BASE_URL}/db/perk/{perk_id}"
+    logging.debug(f"HTML SCRAPE: Fetching HTML for {perk_name_for_log} ({perk_id}) from {perk_url}")
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(perk_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # --- Try to get PerkType from HTML header ---
+        # Structure from your provided HTML for "Enchanted":
+        # <div class="item-name ...">
+        #   <h1 ...>Enchanted</h1>
+        #   <div><span><span>Perk</span></span></div>  <-- This seems to be the structure for "Enchanted"
+        #                                                 Sometimes it might be <div><span>Perk</span> <span>Weapon Perk</span></div>
+        # We need to find the text that is NOT just "Perk".
+        item_header_name_div = soup.find('div', class_='item-name')
+        if item_header_name_div:
+            # Find the div that likely contains the "Perk" and potentially the actual type
+            type_div = item_header_name_div.find('div') 
+            if type_div:
+                # Get all text within this div, split by potential multiple spans, and filter
+                all_text_parts = [t.strip() for t in type_div.get_text(separator='|', strip=True).split('|') if t.strip()]
+                # Find the part that isn't just "Perk"
+                actual_type_from_html = next((part for part in all_text_parts if part.lower() != 'perk'), None)
+                if actual_type_from_html:
+                    html_details['PerkType_html'] = actual_type_from_html
+                    logging.debug(f"HTML SCRAPE: Found field 'PerkType' with value '{actual_type_from_html}' for {perk_name_for_log}")
+
+        found_details_count = 0
+        # Find elements based on the structure you provided
+        # This is highly dependent on NWDB's HTML structure and might break if they change it.
+        details_section = soup.find('div', class_='panel-item-details-content')
+        if details_section:
+            for span_tag in details_section.find_all('span', class_='stat-name'):
+                field_name = span_tag.get_text(strip=True).replace(':', '').strip() # Added strip here too
+                value_tag = span_tag.find_next_sibling('span', class_='stat-value')
+                if value_tag:
+                    value = value_tag.get_text(strip=True)
+                    if field_name == 'Condition': html_details['ConditionText_html'] = value
+                    elif field_name == 'Compatible With': html_details['CompatibleEquipment_html'] = value
+                    elif field_name == 'Exclusive Labels': html_details['ExclusiveLabels_html'] = value # Might need further parsing for multiple labels
+                    # Add other fields you might want to scrape from HTML here
+
+                    logging.debug(f"HTML SCRAPE: Found field '{field_name}' with value '{value}' for {perk_name_for_log}")
+                    found_details_count += 1
+            if 'PerkType_html' in html_details: # Count it if found above
+                found_details_count +=1
+
+        logging.debug(f"HTML SCRAPE: Finished parsing HTML for {perk_name_for_log}. Found {found_details_count} potential details.")
+
+    except Exception as e:
+        logging.warning(f"HTML SCRAPE: Error fetching/parsing HTML for {perk_name_for_log} ({perk_id}): {e}")
+    return html_details
 
 def scrape_nwdb_perks():
     """
@@ -123,6 +184,22 @@ def scrape_nwdb_perks():
                 
                 craft_mod_data = perk_entry.get('craftMod')
                 craft_mod_item_name = craft_mod_data.get('name') if craft_mod_data else None
+
+                # --- Fallback to HTML scraping if JSON data is missing ---
+                # Check if essential fields are missing from JSON
+                if not actual_perk_type or not condition_text or not compatible_equipment or not (exclusive_labels or exclusive_label_single):
+                    logging.info(f"JSON data incomplete for '{perk_name}'. Attempting HTML scrape for additional details.")
+                    html_scraped_details = scrape_individual_perk_html(perk_id, perk_name)
+                    if html_scraped_details:
+                        # Override with HTML data if JSON was None/empty and HTML provided something
+                        if not actual_perk_type and html_scraped_details.get('PerkType_html'):
+                            actual_perk_type = html_scraped_details.get('PerkType_html')
+                        # Be careful with 'PerkType' as HTML might be generic "Perk"
+                        condition_text = condition_text or html_scraped_details.get('ConditionText_html')
+                        compatible_equipment = compatible_equipment or html_scraped_details.get('CompatibleEquipment_html')
+                        # For exclusive labels, you might need to combine or prioritize
+                        if not exclusive_labels and not exclusive_label_single: # Only if both JSON sources are empty
+                            exclusive_labels = html_scraped_details.get('ExclusiveLabels_html') # HTML might provide a comma-separated string or just one
                 
                 generated_item_label = perk_entry.get('generatedLabel')
 
@@ -139,6 +216,20 @@ def scrape_nwdb_perks():
                     'CraftModItem': craft_mod_item_name,
                     'GeneratedLabel': generated_item_label
                 })
+
+                # --- Add Debugging for Specific Perks ---
+                if perk_name.lower() == 'enchanted':
+                    logging.debug(f"DEBUG: Enchanted Perk Data Extracted:")
+                    logging.debug(f"  id: {perk_id}")
+                    logging.debug(f"  name: {perk_name}")
+                    logging.debug(f"  description: {perk_description}")
+                    logging.debug(f"  PerkType: {actual_perk_type}")
+                    logging.debug(f"  icon_url: {icon_url}")
+                    logging.debug(f"  ConditionText: {condition_text}")
+                    logging.debug(f"  CompatibleEquipment: {compatible_equipment}")
+                    logging.debug(f"  ExclusiveLabels: {exclusive_labels}")
+                    logging.debug(f"  ExclusiveLabel: {exclusive_label_single}")
+                    logging.debug("-" * 20)
 
             except Exception as e:
                 logging.error(f"Error processing a perk entry on page {page_num}: {e}. Entry: {perk_entry}", exc_info=True)

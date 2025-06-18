@@ -57,23 +57,16 @@ if (Test-Path "requirements.txt") {
     Write-Warning "requirements.txt not found. Skipping dependency installation."
 }
 
-# --- Run the Python Scraper Script ---
-Write-Host "Running Python script 'scrape_perks.py' using '$PythonExecutable'..."
-& $PythonExecutable scrape_perks.py
+# --- Run create_db.py to populate the database from perks_buddy.csv ---
+Write-Host "Attempting to update database from perks_buddy.csv using '$PythonExecutable create_db.py'..."
+& $PythonExecutable create_db.py 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Python script 'scrape_perks.py' completed successfully." -ForegroundColor Green
-    Write-Host "Attempting to update database from scraped perks using '$PythonExecutable create_db.py'..."
-    & $PythonExecutable create_db.py # Assuming create_db.py handles repopulation from the CSV
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Python script 'create_db.py' failed with exit code: $LASTEXITCODE. Database might not be up-to-date. Aborting Git operations for perks."
-        exit 1 # Exit if DB update fails to prevent committing a CSV that doesn't match the DB state
-    } else {
-        Write-Host "Database update from perks completed successfully." -ForegroundColor Green
-    }
+    Write-Host "Database population script (create_db.py) completed successfully." -ForegroundColor Green
 } else {
-    Write-Error "Python script 'scrape_perks.py' failed with exit code: $LASTEXITCODE. Aborting Git operations."
-    exit 1 # Exit script if scraping fails
+    Write-Error "Python script 'create_db.py' failed with exit code: $LASTEXITCODE. Database might not be up-to-date. Aborting Git operations."
+    exit 1 # Exit script if DB population fails
 }
+
 
 # Check for and remove .git/index.lock file if it exists
 $LockFile = ".git/index.lock"
@@ -91,16 +84,16 @@ if (Test-Path $LockFile) {
 
 # Commit and push changes (ensure git is initialized in your project and you have proper permissions)
 if ($LockFileRemovedSuccessfully -or -not (Test-Path $LockFile)) {
-    Write-Host "Attempting Git operations for perks_scraped.csv and new_world_data.db..."
-    git add perks_scraped.csv new_world_data.db # Add both files
+    Write-Host "Attempting Git operations for perks_buddy.csv and new_world_data.db..."
+    git add perks_buddy.csv new_world_data.db # Add the new CSV and the DB
     if ($LASTEXITCODE -ne 0) {
         Write-Error "git add failed. Exit code: $LASTEXITCODE"
         # Decide if you want to exit here or allow script to finish
     } else {
         # Check if there are changes staged for commit
-        $gitStatus = git status --porcelain perks_scraped.csv new_world_data.db
+        $gitStatus = git status --porcelain perks_buddy.csv new_world_data.db
         if ($gitStatus) {
-            Write-Host "Changes detected in perks_scraped.csv or new_world_data.db. Committing..."
+            Write-Host "Changes detected in perks_buddy.csv or new_world_data.db. Committing..."
             git commit -m "Update perks data (automated)"
             if ($LASTEXITCODE -ne 0) {
                 Write-Error "git commit failed. Exit code: $LASTEXITCODE"
@@ -114,7 +107,7 @@ if ($LockFileRemovedSuccessfully -or -not (Test-Path $LockFile)) {
                 }
             }
         } else {
-            Write-Host "No changes to commit in perks_scraped.csv or new_world_data.db." -ForegroundColor Yellow
+            Write-Host "No changes to commit in perks_buddy.csv or new_world_data.db." -ForegroundColor Yellow
         }
     }
 } else {
