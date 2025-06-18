@@ -3,11 +3,24 @@
     Updates the perks data by running a Python script and pushing changes to Git.
 #>
 
-# Navigate to the script's directory
-Set-Location -To "$(Split-Path -Path $MyInvocation.MyCommand.Path -Parent)"
+# --- Configuration ---
+# Define the path to your virtual environment's activate script
+# Adjust this path if your virtual environment is named differently or located elsewhere
+$VenvActivateScript = ".\venv\Scripts\Activate.ps1" 
 
-# Activate virtual environment if necessary (adjust path as needed)
-# . .\venv\Scripts\Activate.ps1
+# Navigate to the script's directory
+Set-Location -Path "$(Split-Path -Path $MyInvocation.MyCommand.Path -Parent)"
+
+# --- Activate Virtual Environment ---
+if (Test-Path $VenvActivateScript) {
+    Write-Host "Activating virtual environment: $VenvActivateScript" -ForegroundColor Cyan
+    . $VenvActivateScript # Dot-source to execute in the current scope
+} else {
+    Write-Warning "Virtual environment activation script not found at '$VenvActivateScript'."
+    Write-Warning "The script will attempt to run with the system's Python, which may not have all dependencies."
+    # Consider exiting if the virtual environment is essential:
+    # exit 1
+}
 
 # Run the Python script
 python3 scrape_perks.py # Using python3 explicitly
