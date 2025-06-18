@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.36" 
+__version__ = "0.2.38" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -262,6 +262,7 @@ async def calculate(ctx, expression: str):
 @slash_command(name="nwdb", description="Look up items from New World Database.")
 @slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def nwdb(ctx, item_name: str):
+    await ctx.defer() # Defer the response immediately
     # Load items from CSV
     # item_data = items.load_items_from_csv('items.csv') # No longer load here
     if not ITEM_DATA:
@@ -318,7 +319,7 @@ async def nwdb(ctx, item_name: str):
         if perk_lines:
             embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
     # If item is craftable, mention calculate_craft
-    if get_recipe(item_name):
+    if get_recipe(item_name, ITEM_DATA):
         embed.set_footer(text=f"Type /calculate_craft item_name:{item_name} amount:4 to calculate resources!")
     await ctx.send(embeds=embed)
 
@@ -326,36 +327,54 @@ async def nwdb(ctx, item_name: str):
 @nwdb.autocomplete("item_name")
 async def nwdb_autocomplete(ctx):
     # Provide autocomplete suggestions from items.csv
-    # item_data = items.load_items_from_csv('items.csv') # No longer load here
     if not ITEM_DATA:
         await ctx.send(choices=[])
         return
+
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    matches = [name for name in ITEM_DATA.keys() if search_term in name]
-    
+
+    if not search_term: # If search term is empty, send no choices or a placeholder
+        await ctx.send(choices=[])
+        # Or, send a placeholder:
+        # await ctx.send(choices=[{"name": "Type an item name to search...", "value": "_placeholder_"}])
+        return
+
+    # Optimization: If search term is very short, it might still be too many matches.
+    # For example, limit search if term is less than 2 or 3 characters.
+    # For now, we'll proceed with the search but this is an area for further optimization if needed.
+
+    matches_keys = []
+    # ITEM_DATA.keys() are already lowercase
+    for item_key_lower in ITEM_DATA.keys():
+        if search_term in item_key_lower:
+            matches_keys.append(item_key_lower)
+            if len(matches_keys) >= 25: # Limit to 25 matches early
+                break
+
     choices = []
-    for match_key in list(matches)[:25]:
+    for match_key_lower in matches_keys: # Iterate only up to 25 found matches
         # Assuming item_data[match_key] is a dict containing item details
         # and has a field like 'Name' or 'name' for the display name.
         # Fallback to title-cased key if specific name field isn't found.
-        item_details = ITEM_DATA.get(match_key, {})
-        display_name = item_details.get('Name', item_details.get('name', match_key.title()))
-        choices.append({"name": display_name, "value": match_key}) # Send the key (lowercase) as value
+        item_details = ITEM_DATA.get(match_key_lower, {})
+        # Use the 'name' field from the loaded item_data which should have original casing
+        display_name = item_details.get('Name', item_details.get('name', match_key_lower.title()))
+        choices.append({"name": display_name, "value": match_key_lower}) # Send the key (lowercase) as value
 
     # Discord allows max 25 choices
     await ctx.send(choices=choices)
-
 
 @slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
-    recipe = get_recipe(item_name)
+    await ctx.defer() # Defer response
+    recipe = get_recipe(item_name, ITEM_DATA)
     if not recipe:
         await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
         return
     # Show all resources, including intermediates
-    all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True)
+    all_materials = calculate_crafting_materials(item_name, ITEM_DATA, amount or 1, include_intermediate=True)
     if not all_materials:
         await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
         return
@@ -368,16 +387,30 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
 @calculate_craft.autocomplete("item_name")
 async def calculate_craft_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    matches = [name for name in RECIPES.keys() if search_term in name]
-    choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
+
+    if not search_term:
+        await ctx.send(choices=[])
+        return
+
+    matches = []
+    # RECIPES keys are already lowercase if defined consistently
+    for recipe_key_lower in RECIPES.keys():
+        if search_term in recipe_key_lower:
+            matches.append(recipe_key_lower)
+            if len(matches) >= 25:
+                break
+    
+    choices = [{"name": name.title(), "value": name} for name in matches]
     await ctx.send(choices=choices)
 
 
 @slash_command(name="recipe", description="Show the full recipe breakdown for a craftable item and track it.")
 @slash_option("item_name", "The name of the item to show the recipe for", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def recipe(ctx, item_name: str):
+    await ctx.defer() # Defer response
+
     from recipes import get_recipe, fetch_recipe_from_nwdb, track_recipe
-    recipe = get_recipe(item_name)
+    recipe = get_recipe(item_name, ITEM_DATA)
     if not recipe:
         # Try to fetch from nwdb.info
         recipe = fetch_recipe_from_nwdb(item_name)
@@ -407,13 +440,29 @@ async def recipe(ctx, item_name: str):
 @recipe.autocomplete("item_name")
 async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    # Load all items from CSV for autocomplete
-    # item_data = items.load_items_from_csv('items.csv') # No longer load here
+
     if not ITEM_DATA:
         await ctx.send(choices=[])
         return
-    matches = [name for name in ITEM_DATA.keys() if search_term in name]
-    choices = [{"name": name.title(), "value": name} for name in list(matches)[:25]]
+    
+    if not search_term:
+        await ctx.send(choices=[])
+        return
+
+    matches_keys = []
+    for item_key_lower in ITEM_DATA.keys(): # ITEM_DATA keys are already lowercase
+        # We also want to check if the item is in RECIPES, as /recipe is for craftable items
+        if search_term in item_key_lower and (item_key_lower in RECIPES or get_recipe(item_key_lower, ITEM_DATA)): # Check if a recipe exists
+            matches_keys.append(item_key_lower)
+            if len(matches_keys) >= 25:
+                break
+
+    choices = []
+    for match_key_lower in matches_keys:
+        item_details = ITEM_DATA.get(match_key_lower, {})
+        display_name = item_details.get('Name', item_details.get('name', match_key_lower.title()))
+        choices.append({"name": display_name, "value": match_key_lower})
+
     await ctx.send(choices=choices)
 
 # --- Build Management Commands ---
@@ -1050,10 +1099,17 @@ SILLY_MENTION_RESPONSES = [
 
 # Mention handler
 @bot.event()
-async def on_message_create(event):
-    message = getattr(event, "message", None) or getattr(event, "data", None)
+async def on_message_create(event_name: str, event_data): # event_data is typically the Message object
+    # In v4 style, the second argument is usually the primary payload (e.g., Message object)
+    message = event_data 
+    
     if not message:
         return
+    # Ensure message is a Message object, not a string or other type if dispatch is unexpected
+    if not isinstance(message, Message):
+        logging.warning(f"on_message_create received unexpected event_data type: {type(event_data)}. Value: {event_data}")
+        return
+
     author = getattr(message, "author", None)
     if not author or getattr(author, "bot", False):
         return
@@ -1096,10 +1152,17 @@ async def _log_server_activity(guild_id: str, embed: Embed, text_message: Option
 
 
 @bot.event()
-async def on_guild_member_add(member: Member):
+async def on_guild_member_add(event_name: str, member: Member):
     """Handles new member joins and sends a welcome message if configured."""
     if not member.guild:
         return # Should not happen for this event, but good practice
+
+    # Defensive check if member is not actually a Member object
+    if not isinstance(member, Member):
+        logging.error(f"on_guild_member_add received non-Member object for member: {type(member)}. Value: {member}")
+        # Attempt to fetch member if 'member' was an ID, though this is unlikely for this event
+        # This part is highly speculative and depends on what 'member' might be if not a Member object.
+        return
 
     guild_id_str = str(member.guild.id)
     settings = get_welcome_setting(guild_id_str)
@@ -1123,8 +1186,13 @@ async def on_guild_member_add(member: Member):
 
 # --- Server Activity Logging Events ---
 @bot.event()
-async def on_message_delete(message: Message):
-    if not message.guild: # Only log guild messages
+async def on_message_delete(event_name: str, message: Message):
+    if not isinstance(message, Message):
+        logging.warning(f"on_message_delete received non-Message object: {type(message)}. Value: {message}")
+        return
+        
+    # Original check:
+    if not getattr(message, 'guild', None): # Only log guild messages
         return
 
     # Message content might not be available if not cached or intent is missing
@@ -1147,10 +1215,19 @@ async def on_message_delete(message: Message):
     await _log_server_activity(str(message.guild.id), embed)
 
 @bot.event()
-async def on_message_update(before: Message, after: Message):
-    if not after.guild or not after.author or after.author.bot: # Only log guild messages from users
+async def on_message_update(event_name: str, before: Optional[Message], after: Message):
+    # Defensive checks for types, as the original error implies _args might be empty for this event
+    if not isinstance(after, Message):
+        logging.error(f"on_message_update: 'after' is not a Message object. Type: {type(after)}, Value: {after}. This indicates a library dispatch issue.")
         return
-    if before and before.content == after.content and not (before.embeds != after.embeds): # Ignore if only embeds changed by bot itself or no actual content change
+    if before is not None and not isinstance(before, Message):
+        logging.warning(f"on_message_update: 'before' is not None and not a Message object. Type: {type(before)}, Value: {before}")
+        # Depending on library behavior, 'before' might be None if not in cache.
+        # If it's something else unexpected, it's an issue.
+
+    if not getattr(after, 'guild', None) or not getattr(after, 'author', None) or getattr(after.author, 'bot', True): # Only log guild messages from users
+        return
+    if before and getattr(before, 'content', None) == getattr(after, 'content', None) and not (getattr(before, 'embeds', []) != getattr(after, 'embeds', [])): # Ignore if only embeds changed by bot itself or no actual content change
         return
 
     old_content = before.content if before and before.content else "[Content not available or was an embed]"
@@ -1174,8 +1251,12 @@ async def on_message_update(before: Message, after: Message):
     await _log_server_activity(str(after.guild.id), embed)
 
 @bot.event()
-async def on_guild_member_remove(member: Member):
-    if not member.guild:
+async def on_guild_member_remove(event_name: str, member: Member):
+    if not isinstance(member, Member):
+        logging.error(f"on_guild_member_remove received non-Member object: {type(member)}. Value: {member}")
+        return
+
+    if not getattr(member, 'guild', None):
         return
 
     embed = Embed(
@@ -1184,15 +1265,19 @@ async def on_guild_member_remove(member: Member):
         color=0xFFA500, # Orange
         timestamp=datetime.datetime.now(datetime.timezone.utc)
     )
-    if member.avatar:
+    if getattr(member, 'avatar', None):
       embed.set_thumbnail(url=member.avatar.url)
 
     await _log_server_activity(str(member.guild.id), embed)
 
 @bot.event()
-async def on_guild_ban(guild_id: str, user: User): # Corrected parameters based on common lib patterns
+async def on_guild_ban(event_name: str, guild_id: str, user: User): # Assuming guild_id and user are passed
     guild = await bot.fetch_guild(guild_id) # Fetch guild if only ID is provided
     if not guild: return
+
+    if not isinstance(user, User):
+        logging.error(f"on_guild_ban received non-User object: {type(user)}. Value: {user}")
+        return
 
     embed = Embed(
         title="🔨 Member Banned",
@@ -1200,14 +1285,18 @@ async def on_guild_ban(guild_id: str, user: User): # Corrected parameters based 
         color=0xDC143C, # Crimson
         timestamp=datetime.datetime.now(datetime.timezone.utc)
     )
-    if user.avatar:
+    if getattr(user, 'avatar', None):
         embed.set_thumbnail(url=user.avatar.url)
     await _log_server_activity(str(guild.id), embed)
 
 @bot.event()
-async def on_guild_unban(guild_id: str, user: User):
+async def on_guild_unban(event_name: str, guild_id: str, user: User):
     guild = await bot.fetch_guild(guild_id)
     if not guild: return
+
+    if not isinstance(user, User):
+        logging.error(f"on_guild_unban received non-User object: {type(user)}. Value: {user}")
+        return
 
     embed = Embed(
         title="🤝 Member Unbanned",
@@ -1215,27 +1304,37 @@ async def on_guild_unban(guild_id: str, user: User):
         color=0x32CD32, # LimeGreen
         timestamp=datetime.datetime.now(datetime.timezone.utc)
     )
-    if user.avatar:
+    if getattr(user, 'avatar', None):
         embed.set_thumbnail(url=user.avatar.url)
     await _log_server_activity(str(guild.id), embed)
 
 @bot.event()
-async def on_guild_role_create(role: Role):
+async def on_guild_role_create(event_name: str, role: Role):
+    if not isinstance(role, Role):
+        logging.error(f"on_guild_role_create received non-Role object: {type(role)}. Value: {role}")
+        return
+
     embed = Embed(
         title="✨ Role Created",
         description=f"Role: {role.mention} (`{role.name}` | `{role.id}`)",
         color=0x00FF00, # Green
     )
-    await _log_server_activity(str(role.guild.id), embed)
+    if hasattr(role, 'guild') and role.guild: # Ensure role has guild context
+        await _log_server_activity(str(role.guild.id), embed)
 
 @bot.event()
-async def on_guild_role_delete(role: Role): # Assuming role object is passed
+async def on_guild_role_delete(event_name: str, role: Role): 
+    if not isinstance(role, Role):
+        logging.error(f"on_guild_role_delete received non-Role object: {type(role)}. Value: {role}")
+        return
+
     embed = Embed(
         title="🗑️ Role Deleted",
         description=f"Role Name: `{role.name}` (ID: `{role.id}`)",
         color=0xFF4500, # OrangeRed
     )
-    await _log_server_activity(str(role.guild.id), embed)
+    if hasattr(role, 'guild') and role.guild: # Ensure role has guild context
+        await _log_server_activity(str(role.guild.id), embed)
 
 
 # --- New World funny status (RPC) rotation ---
@@ -1349,26 +1448,34 @@ def load_all_game_data():
     global ITEM_DATA, ALL_PERKS_DATA
     logging.info("Starting to load game data...")
 
-    ITEM_DATA = items.load_items_from_csv('items.csv')
-    if not ITEM_DATA:
-        logging.error("CRITICAL: Failed to load item_data from items.csv! Item-related commands will fail.")
-    else:
-        logging.info(f"Successfully loaded {len(ITEM_DATA)} items.")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    items_csv_path = os.path.join(script_dir, 'items.csv')
+    perks_csv_path = os.path.join(script_dir, 'perks.csv') # Assuming perks.csv is in the same directory
 
-    ALL_PERKS_DATA = perks.load_perks_from_csv()
-    if not ALL_PERKS_DATA:
-        logging.error("CRITICAL: Failed to load all_perks_data from perks.csv! Perk-related commands will fail.")
+    ITEM_DATA = items.load_items_from_csv(items_csv_path)
+    if not ITEM_DATA:
+        logging.error(f"CRITICAL: Failed to load item_data from {items_csv_path}! Item-related commands will fail.")
+        ITEM_DATA = {} # Ensure it's an empty dict if loading fails
     else:
-        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks.")
+        logging.info(f"Successfully loaded {len(ITEM_DATA)} items from {items_csv_path}.")
+
+    ALL_PERKS_DATA = perks.load_perks_from_csv(perks_csv_path) # Pass the path for consistency
+    if not ALL_PERKS_DATA:
+        logging.error(f"CRITICAL: Failed to load all_perks_data from {perks_csv_path}! Perk-related commands will fail.")
+        ALL_PERKS_DATA = {} # Ensure it's an empty dict
+    else:
+        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks from {perks_csv_path}.")
     logging.info("Game data loading process complete.")
 
 @bot.event()
 async def on_ready():
+    # load_all_game_data() # Moved to be called before bot.start()
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
     asyncio.create_task(check_for_updates())
     logging.info(f"Ina is ready! Logged in as {bot.user.username} ({bot.user.id})")
 
 if __name__ == "__main__":
+    load_all_game_data() # Load data before starting the bot
     try:
         bot.start()
     except Exception as e:
