@@ -74,7 +74,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.49" 
+__version__ = "0.2.50" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
