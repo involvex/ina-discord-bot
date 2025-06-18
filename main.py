@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.61" 
+__version__ = "0.2.62" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -509,13 +509,12 @@ async def nwdb_autocomplete(ctx: SlashContext): # Added type hint for ctx
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
     await ctx.defer() # Defer response
-    # IMPORTANT: get_recipe and calculate_crafting_materials in recipes.py
-    # MUST be adapted to query the SQLite database instead of using in-memory dicts.
-    # The following calls assume recipes.py has been updated.
+    # The get_recipe and calculate_crafting_materials functions (from recipes.py)
+    # are responsible for querying the SQLite database (new_world_data.db).
 
     recipe_details = None
     try:
-        # get_recipe now fetches from DB and doesn't need ITEM_DATA or ITEM_ID_TO_NAME_MAP
+        # Fetch recipe details from the database via recipes.py.
         recipe_details = get_recipe(item_name) 
     except Exception as e: # Catch any unexpected error during recipe fetching
         logging.error(f"Unexpected error in calculate_craft calling get_recipe for '{item_name}': {e}", exc_info=True)
@@ -528,7 +527,7 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
     
     all_materials = None
     try:
-        # calculate_crafting_materials also updated to not need ITEM_DATA etc.
+        # Calculate all materials, including intermediates, using data from the database via recipes.py.
         all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True)
     except Exception as e: # Catch any unexpected error during material calculation
         logging.error(f"Unexpected error in calculate_craft calling calculate_crafting_materials for '{item_name}': {e}", exc_info=True)
@@ -575,11 +574,11 @@ async def calculate_craft_autocomplete(ctx: SlashContext): # Added type hint
 async def recipe(ctx, item_name: str):
     await ctx.defer() # Defer response
 
-    # Use the get_recipe function from recipes.py which handles DB lookup
-    # from both 'recipes' and 'items' tables.
+    # The get_recipe function (from recipes.py) handles the database lookup 
+    # for recipe details in new_world_data.db.
     recipe_dict = None
     try:
-        # get_recipe is already imported at the top of the file
+        # Fetch recipe details from the database via recipes.py.
         recipe_dict = get_recipe(item_name)
     except Exception as e:
         logging.error(f"Unexpected error in /recipe calling get_recipe for '{item_name}': {e}", exc_info=True)
