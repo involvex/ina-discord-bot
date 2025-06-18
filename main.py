@@ -795,26 +795,72 @@ async def perk_command(ctx, perk_name: str):
         return default
 
     # Use sanitized key names based on create_db.py logic
-    name = get_any_perk_info(perk_info, ['Name', 'PerkName'], perk_name) # 'Name' or 'PerkName'
-    description = get_any_perk_info(perk_info, ['Description', 'Desc', 'description', 'DescText', 'EffectText'], 'No description available.') # Added more potential keys
-    perk_type = get_any_perk_info(perk_info, ['Type', 'PerkType', 'Category'], 'Unknown Type') # 'PerkType'
+    name_raw = get_any_perk_info(perk_info, ['Name', 'PerkName'], perk_name) # 'Name' or 'PerkName'
+    description_raw = get_any_perk_info(perk_info, ['Description', 'Desc', 'description', 'DescText', 'EffectText'], 'No description available.')
+    perk_type_raw = get_any_perk_info(perk_info, ['Type', 'PerkType', 'Category'], 'Unknown Type')
     icon_url = get_any_perk_info(perk_info, ['Icon', 'IconPath', 'icon_url'], None) # 'IconPath' or 'icon_url' from scrape_perks
     perk_id = get_any_perk_info(perk_info, ['PerkID', 'ID', 'id'], None) # 'PerkID' or 'id' from scrape_perks
 
-    embed = Embed(title=str(name), color=0x1ABC9C) # Teal
+    # Craft Mod specific info - these keys are based on common column names from NWDB data sources
+    # (e.g., perks_scraped.csv) and how create_db.py might sanitize them.
+    generated_label = get_any_perk_info(perk_info, ['GeneratedLabel', 'PerkApplicationType'], None)
+    craft_mod_item_name = get_any_perk_info(perk_info, ['ItemName', 'IngredientName', 'CraftModItem'], None) # Item that applies the perk
+    condition = get_any_perk_info(perk_info, ['ConditionDescription', 'ConditionText'], None)
+    compatible_with_raw = get_any_perk_info(perk_info, ['EquipType', 'CompatibleItemTypes', 'CompatibleEquipment'], None)
+    exclusive_labels_raw = get_any_perk_info(perk_info, ['ExclusiveLabels', 'ExclusiveLabel', 'MutatorGroup'], None)
+
+    # Determine if it's a Craft Mod
+    is_craft_mod_by_label = generated_label and 'crafting mod' in str(generated_label).lower()
+    is_craft_mod_by_type = 'craft mod' in str(perk_type_raw).lower()
+    is_craft_mod = is_craft_mod_by_label or is_craft_mod_by_type
+
+    display_title = str(name_raw)
+    if is_craft_mod:
+        if "craft mod" not in str(name_raw).lower(): # Avoid "Craft Mod: Refreshing Craft Mod"
+            display_title = f"Craft Mod: {str(name_raw)}"
+
+    embed = Embed(title=display_title, color=0x1ABC9C) # Teal
     if icon_url:
         embed.set_thumbnail(url=str(icon_url).strip())
 
     # Scale description if applicable (ensure scale_value_with_gs is robust)
-    scaled_description = scale_value_with_gs(str(description)) # Ensure description is string
+    scaled_description = scale_value_with_gs(str(description_raw))
     embed.add_field(name="Description", value=scaled_description, inline=False)
-    embed.add_field(name="Type", value=str(perk_type), inline=True)
+    embed.add_field(name="Type", value=str(perk_type_raw), inline=True)
+
+    if is_craft_mod:
+        if craft_mod_item_name:
+            embed.add_field(name="Crafted With / Source", value=str(craft_mod_item_name), inline=True)
+        
+        # Add "Scales with Gear Score" note if placeholders were in description
+        if '${' in str(description_raw):
+            embed.add_field(name="Scaling", value="Values scale with Gear Score (shown at 725 GS)", inline=True)
+
+        if condition:
+            embed.add_field(name="Condition", value=str(condition), inline=False) # Often longer
+
+        if compatible_with_raw:
+            compatible_list = [item.strip() for item in str(compatible_with_raw).split(',') if item.strip()]
+            if compatible_list:
+                # A more sophisticated mapping could be added here later to make names friendlier
+                # e.g., "1HSword" -> "Sword", "2HGreatAxe" -> "Great Axe"
+                formatted_compatible = ", ".join(compatible_list)
+                embed.add_field(name="Compatible With", value=formatted_compatible, inline=False)
+
+        if exclusive_labels_raw:
+            exclusive_list = [label.strip() for label in str(exclusive_labels_raw).split(',') if label.strip()]
+            if exclusive_list:
+                formatted_exclusive = ", ".join(exclusive_list)
+                embed.add_field(name="Exclusive Labels", value=formatted_exclusive, inline=True) # Usually short
 
     if perk_id:
         embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/perk/{str(perk_id).strip()})", inline=True)
     else:
         # If PerkID is not directly available, you might try to construct a search link
-        embed.add_field(name="NWDB Link", value="ID not available for direct link", inline=True)
+        # For now, keeping it simple. A search link could be:
+        # search_name = urllib.parse.quote_plus(str(name_raw))
+        # embed.add_field(name="NWDB Link", value=f"[Search on NWDB](https://nwdb.info/db/perks/?search={search_name})", inline=True)
+        embed.add_field(name="NWDB Link", value="Perk ID not found for direct link", inline=True)
 
     embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
     await ctx.send(embeds=embed)
@@ -822,7 +868,7 @@ async def perk_command(ctx, perk_name: str):
 def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
     """
     Safely evaluates a perk expression string after substituting perkMultiplier.
-    Example: expr_str = "2.4 * perkMultiplier", gs_multiplier_val = 1.45
+    Example: expr_str = "0.024 * perkMultiplier", gs_multiplier_val = 1.45 (for GS 725 from base 500)
     """
     try:
         # Replace perkMultiplier with its numeric value
@@ -836,11 +882,15 @@ def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
 
         if isinstance(result, float):
             if result.is_integer():
-                return str(int(result))
-            # Format to a reasonable number of decimal places, remove trailing zeros
-            formatted_result = f"{result:.3f}".rstrip('0').rstrip('.')
-            return formatted_result
-        return str(result)
+                # If it's a whole number, display as int
+                return str(int(result)) 
+            # For percentages or small numbers, show a few decimal places.
+            # If it's a value like damage, maybe fewer.
+            # Let's try to be smart: if < 1, show more precision.
+            num_decimals = 3 if abs(result) < 1 and abs(result) > 0 else 2
+            formatted_result = f"{result:.{num_decimals}f}".rstrip('0').rstrip('.')
+            return formatted_result if formatted_result != "0" else "0" # Avoid showing just "." if result is 0.0
+        return str(result) # Fallback for non-float results (e.g., if expression was just a number)
     except Exception as e:
         logging.warning(f"Could not evaluate perk expression '{expr_str}' with multiplier {gs_multiplier_val}: {e}")
         # Return the original expression part to indicate an issue or a placeholder error.
