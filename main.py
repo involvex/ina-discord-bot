@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.20" 
+__version__ = "0.2.22" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -242,7 +242,7 @@ async def calculate(ctx, expression: str):
         await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
 
 
-@slash_command("nwdb", description="Look up items from New World Database.")
+@slash_command(name="nwdb", description="Look up items from New World Database.")
 @slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def nwdb(ctx, item_name: str):
     # Load items from CSV
@@ -320,7 +320,7 @@ async def nwdb_autocomplete(ctx):
     await ctx.send(choices=choices)
 
 
-@slash_command("calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
+@slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
@@ -347,7 +347,7 @@ async def calculate_craft_autocomplete(ctx):
     await ctx.send(choices=choices)
 
 
-@slash_command("recipe", description="Show the full recipe breakdown for a craftable item and track it.")
+@slash_command(name="recipe", description="Show the full recipe breakdown for a craftable item and track it.")
 @slash_option("item_name", "The name of the item to show the recipe for", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def recipe(ctx, item_name: str):
     from recipes import get_recipe, fetch_recipe_from_nwdb, track_recipe
@@ -378,7 +378,7 @@ async def recipe(ctx, item_name: str):
     await ctx.send(embeds=embed)
 
 
-@recipe.autocomplete("item_name")
+@recipe.autocomplete(name="item_name")
 async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     # Load all items from CSV for autocomplete
@@ -396,7 +396,7 @@ async def build_group(ctx: SlashContext):
     """Base command for build management."""
     pass
 
-@build_group.subcommand(sub_cmd_name="add", sub_cmd_description="Add a build from nw-buddy.de.")
+@build_group.subcommand(name="add", description="Add a build from nw-buddy.de.")
 @slash_option("link", "The nw-buddy.de build link", opt_type=OptionType.STRING, required=True)
 @slash_option("name", "A name for this build", opt_type=OptionType.STRING, required=True)
 @slash_option("keyperks", "Comma-separated list of key perks (optional, paste from Perk stacks)", opt_type=OptionType.STRING, required=False)
@@ -440,7 +440,7 @@ async def build_add(ctx: SlashContext, link: str, name: str, keyperks: str = Non
     await ctx.send(f"Build '{name}' added!", ephemeral=True)
 
 
-@build_group.subcommand(sub_cmd_name="list", sub_cmd_description="Show a list of saved builds.")
+@build_group.subcommand(name="list", description="Show a list of saved builds.")
 async def build_list(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
@@ -469,8 +469,8 @@ async def build_list(ctx: SlashContext):
 
 
 @build_group.subcommand(
-    sub_cmd_name="remove",
-    sub_cmd_description="Remove a saved build (requires 'Manage Server' permission)."
+    name="remove",
+    description="Remove a saved build (requires 'Manage Server' permission)."
 )
 @slash_option(
     "name",
@@ -508,21 +508,21 @@ async def build_remove(ctx: SlashContext, name: str):
         logging.error(f"Error writing builds file after removing build: {e}")
         await ctx.send("An error occurred while trying to remove the build.", ephemeral=True)
 
-@build_remove.autocomplete("name")
+@build_remove.autocomplete(name="name")
 async def build_remove_autocomplete(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError): # Handle empty or corrupt file
         await ctx.send(choices=[])
-        return
+        return # Ensure return after sending empty choices
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     matches = [build.get("name") for build in builds_data if build.get("name") and search_term in build.get("name", "").lower()]
     choices = [{"name": build_name, "value": build_name} for build_name in list(set(matches))[:25]] # Use set for unique names
     await ctx.send(choices=choices)
 
 
-@slash_command("perk", description="Look up information about a specific New World perk.")
+@slash_command(name="perk", description="Look up information about a specific New World perk.")
 @slash_option(
     "perk_name",
     description="The name of the perk to look up",
@@ -600,7 +600,7 @@ def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
         # Return the original expression part to indicate an issue or a placeholder error.
         return f"[EVAL_ERROR: {expr_str}]"
 
-def scale_value_with_gs(base_value: str, gear_score: int = 725) -> str:
+def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str:
     """
     Scales numeric values within a perk description string based on Gear Score.
     Replaces placeholders like ${expression * perkMultiplier} or ${value} with their calculated/literal values.
@@ -617,7 +617,7 @@ def scale_value_with_gs(base_value: str, gear_score: int = 725) -> str:
 
     return re.sub(r'\$\{(.*?)\}', replace_match, base_value)
 
-@perk_command.autocomplete("perk_name")
+@perk_command.autocomplete(name="perk_name")
 async def perk_autocomplete(ctx):
     all_perks_data = perks.load_perks_from_csv()
     if not all_perks_data:
@@ -649,7 +649,7 @@ async def perk_autocomplete(ctx):
     await ctx.send(choices=unique_matches)
 
 
-@slash_command("about", description="Show information about Ina's New World Bot.")
+@slash_command(name="about", description="Show information about Ina's New World Bot.")
 async def about_command(ctx):
     embed = Embed(
         title="About Ina's New World Bot",
@@ -838,7 +838,7 @@ async def settings(ctx: SlashContext):
     # if called directly, though usually users will invoke subcommands.
     pass
 
-@settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
+@settings.subcommand(name="permit", description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
 async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed to avoid conflict if settings was a class
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
@@ -850,7 +850,7 @@ async def settings_permit_subcommand(ctx: SlashContext, user: User): # Renamed t
     else:
         await ctx.send(f"ℹ️ {user.mention} already has bot management permissions.", ephemeral=True)
 
-@settings.subcommand(sub_cmd_name="unpermit", sub_cmd_description="Revokes a user's bot management permissions.")
+@settings.subcommand(name="unpermit", description="Revokes a user's bot management permissions.")
 @slash_option("user", "The user to revoke permissions from.", opt_type=OptionType.USER, required=True)
 async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and ctx.author.id != OWNER_ID:
@@ -866,7 +866,7 @@ async def settings_unpermit_subcommand(ctx: SlashContext, user: User): # Renamed
     else:
         await ctx.send(f"ℹ️ {user.mention} does not have bot management permissions.", ephemeral=True)
 
-@settings.subcommand(sub_cmd_name="listmanagers", sub_cmd_description="Lists users with bot management permissions.")
+@settings.subcommand(name="listmanagers", description="Lists users with bot management permissions.")
 async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
     if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID :
         await ctx.send("You need Administrator permissions or be a Bot Manager/Owner to use this command.", ephemeral=True)
@@ -896,12 +896,13 @@ async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
     await ctx.send(embeds=embed, ephemeral=True)
 
 
-@settings.subcommand_group(name="welcomemessages", description="Manage welcome messages for new members.")
-async def settings_welcomemessages(ctx: SlashContext):
+# Define the subcommand group 'welcomemessages' under 'settings'
+@settings.subcommand(name="welcomemessages", description="Manage welcome messages for new members.")
+async def settings_welcomemessages_group(ctx: SlashContext): # Renamed function to indicate it's the group base
     """Base for welcome message settings."""
     pass
 
-@settings_welcomemessages.subcommand(
+@settings_welcomemessages_group.subcommand(
     sub_cmd_name="enable",
     sub_cmd_description="Enables welcome messages in a specific channel."
 )
@@ -923,7 +924,7 @@ async def settings_welcomemessages_enable(ctx: SlashContext, channel: GuildText)
     save_welcome_setting(str(ctx.guild.id), True, str(channel.id))
     await ctx.send(f"✅ Welcome messages are now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
 
-@settings_welcomemessages.subcommand(
+@settings_welcomemessages_group.subcommand(
     sub_cmd_name="disable",
     sub_cmd_description="Disables welcome messages for this server."
 )
@@ -938,7 +939,7 @@ async def settings_welcomemessages_disable(ctx: SlashContext):
     save_welcome_setting(str(ctx.guild.id), False, None)
     await ctx.send("✅ Welcome messages are now **disabled** for this server.", ephemeral=True)
 
-@settings_welcomemessages.subcommand(
+@settings_welcomemessages_group.subcommand(
     sub_cmd_name="status",
     sub_cmd_description="Shows the current welcome message configuration."
 )
@@ -956,12 +957,13 @@ async def settings_welcomemessages_status(ctx: SlashContext):
     else:
         await ctx.send("ℹ️ Welcome messages are currently **disabled** for this server.", ephemeral=True)
 
-@settings.subcommand_group(name="logging", description="Manage server activity logging.")
-async def settings_logging(ctx: SlashContext):
+# Define the subcommand group 'logging' under 'settings'
+@settings.subcommand(name="logging", description="Manage server activity logging.")
+async def settings_logging_group(ctx: SlashContext): # Renamed function to indicate it's the group base
     """Base for server activity logging settings."""
     pass
 
-@settings_logging.subcommand(
+@settings_logging_group.subcommand(
     sub_cmd_name="enable",
     sub_cmd_description="Enables server activity logging in a specific channel."
 )
@@ -972,7 +974,7 @@ async def settings_logging(ctx: SlashContext):
     required=True,
     channel_types=[ChannelType.GUILD_TEXT]
 )
-async def settings_logging_enable(ctx: SlashContext, channel: GuildText):
+async def settings_logging_enable(ctx: SlashContext, channel: GuildText): # Type hint as GuildText
     if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
         await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
         return
@@ -983,7 +985,7 @@ async def settings_logging_enable(ctx: SlashContext, channel: GuildText):
     save_logging_setting(str(ctx.guild.id), True, str(channel.id))
     await ctx.send(f"✅ Server activity logging is now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
 
-@settings_logging.subcommand(
+@settings_logging_group.subcommand(
     sub_cmd_name="disable",
     sub_cmd_description="Disables server activity logging for this server."
 )
@@ -998,7 +1000,7 @@ async def settings_logging_disable(ctx: SlashContext):
     save_logging_setting(str(ctx.guild.id), False, None)
     await ctx.send("✅ Server activity logging is now **disabled** for this server.", ephemeral=True)
 
-@settings_logging.subcommand(
+@settings_logging_group.subcommand(
     sub_cmd_name="status",
     sub_cmd_description="Shows the current server activity logging configuration."
 )
