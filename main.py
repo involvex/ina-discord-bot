@@ -8,6 +8,7 @@ import math
 import unicodedata
 import re
 import items
+import perks # Import the new perks module
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType
 from typing import Optional
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
@@ -55,7 +56,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "recipe": "Show the full recipe breakdown for a craftable item and track it.",
         "addbuild": "Add a build from nw-buddy.de with a name and optional key perks.",
         "builds": "Show a list of saved builds.",
-        "removebuild": "Remove a saved build (requires 'Manage Server' permission)."
+        "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
+        "perk": "Look up information about a specific New World perk."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -342,6 +344,89 @@ async def removebuild_autocomplete(ctx):
     matches = [build.get("name") for build in builds_data if build.get("name") and search_term in build.get("name", "").lower()]
     choices = [{"name": build_name, "value": build_name} for build_name in list(set(matches))[:25]] # Use set for unique names
     await ctx.send(choices=choices)
+
+
+@slash_command("perk", description="Look up information about a specific New World perk.")
+@slash_option(
+    "perk_name",
+    description="The name of the perk to look up",
+    opt_type=OptionType.STRING,
+    required=True,
+    autocomplete=True
+)
+async def perk_command(ctx, perk_name: str):
+    all_perks_data = perks.load_perks_from_csv() # Using the function from perks.py
+    if not all_perks_data:
+        await ctx.send("Could not load perk data. Please check server logs.", ephemeral=True)
+        return
+
+    perk_name_lower = perk_name.lower()
+    if perk_name_lower not in all_perks_data:
+        await ctx.send(f"Perk '{perk_name}' not found in the database.", ephemeral=True)
+        return
+
+    perk_info = all_perks_data[perk_name_lower]
+
+    # Helper to get values safely, similar to the one in /nwdb
+    def get_any_perk_info(data, keys, default):
+        for k_csv in keys: # CSV headers can have varied casing
+            for actual_key_in_data in data.keys():
+                if actual_key_in_data.lower() == k_csv.lower():
+                    if data[actual_key_in_data]:
+                        return data[actual_key_in_data]
+        return default
+
+    name = get_any_perk_info(perk_info, ['name', 'perkname'], perk_name)
+    description = get_any_perk_info(perk_info, ['description', 'desc'], 'No description available.')
+    perk_type = get_any_perk_info(perk_info, ['type', 'perktype', 'category'], 'Unknown Type')
+    icon_url = get_any_perk_info(perk_info, ['icon_url', 'icon'], None)
+    perk_id = get_any_perk_info(perk_info, ['id', 'perkid'], None)
+
+    embed = Embed(title=name, color=0x1ABC9C) # A teal color for perks
+    if icon_url:
+        embed.set_thumbnail(url=icon_url)
+
+    embed.add_field(name="Description", value=description, inline=False)
+    embed.add_field(name="Type", value=perk_type, inline=True)
+
+    if perk_id:
+        embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/perk/{perk_id})", inline=True)
+    else:
+        embed.add_field(name="ID", value="Not available", inline=True)
+
+    embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
+    await ctx.send(embeds=embed)
+
+@perk_command.autocomplete("perk_name")
+async def perk_autocomplete(ctx):
+    all_perks_data = perks.load_perks_from_csv()
+    if not all_perks_data:
+        await ctx.send(choices=[])
+        return
+
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    
+    # Match against the keys of all_perks_data (which are lowercase perk names)
+    # Then retrieve the original display name from the 'name' field in the perk's data for the choice's name
+    matches = []
+    for perk_key_lower, perk_data_dict in all_perks_data.items():
+        if search_term in perk_key_lower:
+            # Try to get the original cased name for display
+            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title()))
+            matches.append({"name": display_name, "value": display_name}) # Send original cased name as value too
+
+    # Ensure unique choices by name (in case of slight variations leading to same display name)
+    # and limit to 25
+    unique_matches = []
+    seen_names = set()
+    for match in matches:
+        if match["name"] not in seen_names:
+            unique_matches.append(match)
+            seen_names.add(match["name"])
+        if len(unique_matches) >= 25:
+            break
+            
+    await ctx.send(choices=unique_matches)
 
 
 # Mention handler

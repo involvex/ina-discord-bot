@@ -1,0 +1,6 @@
+id,name,description,type,icon_url
+PerkID_Weapon_CritChance,Keen,"+11% Critical Hit Chance. (Note: Actual values may scale with Gear Score.)",Weapon Perk,https://cdn.nwdb.info/db/images/live/v30/icons/perks/perkid_weapon_critchance.png
+PerkID_Armor_Ward_AngryEarth,Angry Earth Ward,"+4.9% Damage Absorption against Angry Earth. (Note: Actual values may scale with Gear Score.)",Armor Perk,https://cdn.nwdb.info/db/images/live/v30/icons/perks/perkid_armor_ward_angryearth.png
+PerkID_Common_CDR,Refreshing,"+2.8% Cooldown Reduction. (Note: Actual values may scale with Gear Score.)",General Perk,https://cdn.nwdb.info/db/images/live/v30/icons/perks/perkid_common_cdr.png
+PerkID_Weapon_DmgCon,Vicious,"+11% Critical Hit Damage. (Note: Actual values may scale with Gear Score.)",Weapon Perk,https://cdn.nwdb.info/db/images/live/v30/icons/perks/perkid_weapon_dmgcon.png
+PerkID_ResourcePerks_MiningLuck,Reinforced Mining Luck,"+5% chance at finding rare items while Mining. (Note: Actual values may scale with Gear Score.)",Gathering Perk,https://cdn.nwdb.info/db/images/live/v30/icons/perks/perkid_resourceperks_miningluck.png
