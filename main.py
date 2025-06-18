@@ -11,7 +11,7 @@ import unicodedata
 import re
 import items
 import perks # Import the new perks module
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User
 from typing import Optional
 import packaging.version # For version comparison
 from recipes import get_recipe, calculate_crafting_materials, RECIPES
@@ -23,7 +23,7 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-__version__ = "0.2.1" # << SET YOUR BOT'S CURRENT VERSION HERE
+__version__ = "0.2.2" # << SET YOUR BOT'S CURRENT VERSION HERE
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -585,7 +585,7 @@ async def update_bot_command(ctx):
         return
 
     try:
-        logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) initiated bot update using {executable} with script: {script_path}")
+        logging.info(f"User {ctx.author.username} ({ctx.author.id}) initiated bot update using {executable} with script: {script_path}")
         # Using asyncio.create_subprocess_exec for non-blocking execution
         # Full command: executable *script_args script_path
         process = await asyncio.create_subprocess_exec(
@@ -618,7 +618,7 @@ async def update_bot_command(ctx):
     default_member_permissions=Permissions.MANAGE_GUILD
 )
 async def restart_bot_command(ctx):
-    logging.info(f"Restart command initiated by {ctx.author.user.username} ({ctx.author.id}) in guild {ctx.guild.name} ({ctx.guild.id}).")
+    logging.info(f"Restart command initiated by {ctx.author.username} ({ctx.author.id}) in guild {ctx.guild.name} ({ctx.guild.id}).")
     await ctx.send(
         "✅ Bot shutdown initiated. "
         "The bot process will now attempt to stop.\n"
@@ -636,7 +636,7 @@ async def restart_bot_command(ctx):
     default_member_permissions=Permissions.ADMINISTRATOR
 )
 @slash_option("user", "The user to grant bot management permissions to.", opt_type=OptionType.USER, required=True)
-async def permit_command(ctx, user: Permissions.ADMINISTRATOR): # Type hint for user object
+async def permit_command(ctx, user: User):
     target_user_id = int(user.id)
     managers = load_bot_managers()
 
@@ -646,7 +646,7 @@ async def permit_command(ctx, user: Permissions.ADMINISTRATOR): # Type hint for 
 
     managers.append(target_user_id)
     save_bot_managers(managers)
-    logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) granted bot management permission to {user.username} ({target_user_id}).")
+    logging.info(f"User {ctx.author.username} ({ctx.author.id}) granted bot management permission to {user.username} ({target_user_id}).")
     await ctx.send(f"✅ {user.mention} has been granted bot management permissions.", ephemeral=True)
 
 @slash_command(
@@ -655,7 +655,7 @@ async def permit_command(ctx, user: Permissions.ADMINISTRATOR): # Type hint for 
     default_member_permissions=Permissions.ADMINISTRATOR
 )
 @slash_option("user", "The user to revoke bot management permissions from.", opt_type=OptionType.USER, required=True)
-async def unpermit_command(ctx, user: Permissions.ADMINISTRATOR): # Type hint for user object
+async def unpermit_command(ctx, user: User):
     target_user_id = int(user.id)
     managers = load_bot_managers()
 
@@ -665,7 +665,7 @@ async def unpermit_command(ctx, user: Permissions.ADMINISTRATOR): # Type hint fo
 
     managers.remove(target_user_id)
     save_bot_managers(managers)
-    logging.info(f"User {ctx.author.user.username} ({ctx.author.id}) revoked bot management permission from {user.username} ({target_user_id}).")
+    logging.info(f"User {ctx.author.username} ({ctx.author.id}) revoked bot management permission from {user.username} ({target_user_id}).")
     await ctx.send(f"✅ {user.mention}'s bot management permissions have been revoked.", ephemeral=True)
 
 @slash_command(
@@ -697,6 +697,20 @@ async def listmanagers_command(ctx):
     embed.set_footer(text=f"The Bot Owner (<@{OWNER_ID}>) always has full permissions.")
     await ctx.send(embeds=embed, ephemeral=True)
 
+SILLY_MENTION_RESPONSES = [
+    "Did someone say my name? Or was it just the wind in Aeternum?",
+    "You summoned me! What grand adventure awaits? Or do you just need help with `/help`?",
+    "I sense a disturbance in the Force... oh wait, wrong universe. How can I help you in Aeternum?",
+    "Is that an Azoth staff in your pocket, or are you just happy to see me?",
+    "I was just polishing my gear! What's up?",
+    "Heard you were talking about me! Spill the corrupted beans!",
+    "Yes? I'm here, probably not AFK like some adventurers I know.",
+    "You rang? Hope it's not about another turkey invasion.",
+    "I'm listening... unless there's a rare ore node nearby. Then I'm *really* listening.",
+    "Speak, friend, and enter... my command list with `/help`!",
+    "Beep boop! Just kidding, I'm powered by Aeternum's finest Azoth. What can I do for you?",
+]
+
 # Mention handler
 @bot.event()
 async def on_message_create(event):
@@ -718,44 +732,44 @@ async def on_message_create(event):
         if channel_id:
             channel = await bot.fetch_channel(channel_id)
             # Only send if channel supports send (TextChannel, not GuildForum, GuildCategory, or None)
-            if channel and hasattr(channel, 'send') and channel.__class__.__name__ == 'TextChannel':
-                await channel.send("👋 The winds of Aeternum greet you! Use `/help` to see my commands.")
+            if channel and hasattr(channel, 'send') and isinstance(channel, TextChannel): # More robust check
+                await channel.send(random.choice(SILLY_MENTION_RESPONSES))
 
 
 # --- New World funny status (RPC) rotation ---
 NW_FUNNY_STATUSES = [
-    {"name": "Truthahn des Schreckens", "state": "Wird gejagt... oder jagt?"},
-    {"name": "Hanf für... Seile", "state": "Medizinische Zwecke, schwöre!"},
-    {"name": "Angeln in Aeternum", "state": "Ob Fische als Währung gelten?"},
-    {"name": "die Wildnis", "state": "Verlaufen. Sendet Kekse!"},
-    {"name": "mit optionalen Bossen", "state": "Die waren nicht optional."},
-    {"name": "Steuerverhandlungen", "state": "Mit dem Stadtverwalter."},
-    {"name": "Inventar-Tetris", "state": "Und verliert schon wieder."},
-    {"name": "Azoth-Management", "state": "Kritisch niedrig. Zu Fuß?"},
-    {"name": "Holzfällerei", "state": "Die Bäume kennen meinen Namen."},
-    {"name": "Friedensmodus", "state": "Tut nur so entspannt."},
-    {"name": "Crafting-Wahnsinn", "state": "Kunst oder Schrott?"},
-    {"name": "Expeditionen", "state": "Heiler hat Aggro. Klassiker."},
-    {"name": "PvP", "state": "Sucht Streit, findet den Boden."},
-    {"name": "Open World PvP", "state": "Von 5er-Gruppe 'gefairplayt.'"},
-    {"name": "Belagerungskriege", "state": "Popcorn für die Lag-Show."},
-    {"name": "Ganking 101", "state": "Plant episch, wird gegankt."},
-    {"name": "PvP mit 1 HP", "state": "'Strategie', nicht Glück."},
-    {"name": "Outpost Rush", "state": "Baroness Nash > Spieler."},
-    {"name": "Skelette kloppen", "state": "Die haben 'nen Knochenjob."},
-    {"name": "Dungeon Runs", "state": "Wer hat schon wieder gepullt?!"},
-    {"name": "Elite-Gebiete", "state": "Alles will mich fressen."},
-    {"name": "Questen", "state": "'Töte 10 Wildschweine'. Gähn."},
-    {"name": "Korruptionsportale", "state": "Tentakel-Party!"},
-    {"name": "Hardcore Aeternum", "state": "An Level-5-Wolf gestorben."},
-    {"name": "Hardcore-Wandern", "state": "3h nach Immerfall. Zu Fuß."},
-    {"name": "Hardcore Loot Drop", "state": "Alles weg. Danke, Plünderer."},
-    {"name": "Hardcore mit 1 Leben", "state": "Stolpert. Game Over."},
-    {"name": "Bot-Spotting", "state": "Spieler oder Holzfäller-Bot?"},
-    {"name": "Ressourcen-Routen", "state": "Effizient. Oder Bot."},
-    {"name": "Kampf-Bots", "state": "Nur Light Attacks. Immer."},
-    {"name": "GPS-gesteuerte Spieler", "state": "Keine Abweichung vom Pfad."},
-    {"name": "stumme Mitspieler", "state": "Konzentriert oder Bot?"}
+    {"name": "Terror Turkey", "state": "Being hunted... or hunting?"},
+    {"name": "Hemp for... ropes", "state": "Medicinal purposes, I swear!"},
+    {"name": "Fishing in Aeternum", "state": "Wonder if fish count as currency?"},
+    {"name": "the wilderness", "state": "Lost. Send cookies!"},
+    {"name": "with optional bosses", "state": "They weren't optional."},
+    {"name": "Tax negotiations", "state": "With the governor."},
+    {"name": "Inventory Tetris", "state": "And losing again."},
+    {"name": "Azoth management", "state": "Critically low. On foot?"},
+    {"name": "Logging", "state": "The trees know my name."},
+    {"name": "Peace mode", "state": "Just pretending to be relaxed."},
+    {"name": "Crafting madness", "state": "Art or junk?"},
+    {"name": "Expeditions", "state": "Healer has aggro. Classic."},
+    {"name": "PvP", "state": "Looking for a fight, finds the floor."},
+    {"name": "Open World PvP", "state": "'Fairplayed' by a 5-man group."},
+    {"name": "Siege Wars", "state": "Popcorn for the lag show."},
+    {"name": "Ganking 101", "state": "Plans epic, gets ganked."},
+    {"name": "PvP with 1 HP", "state": "'Strategy', not luck."},
+    {"name": "Outpost Rush", "state": "Baroness Nash > Players."},
+    {"name": "Bashing skeletons", "state": "They have a bone to pick."},
+    {"name": "Dungeon Runs", "state": "Who pulled again?!"},
+    {"name": "Elite Zones", "state": "Everything wants to eat me."},
+    {"name": "Questing", "state": "'Kill 10 boars'. Yawn."},
+    {"name": "Corruption Portals", "state": "Tentacle party!"},
+    {"name": "Hardcore Aeternum", "state": "Died to a level 5 wolf."},
+    {"name": "Hardcore Hiking", "state": "3h to Everfall. On foot."},
+    {"name": "Hardcore Loot Drop", "state": "Everything gone. Thanks, Prowler."},
+    {"name": "Hardcore with 1 Life", "state": "Trips. Game Over."},
+    {"name": "Bot-Spotting", "state": "Player or lumberjack bot?"},
+    {"name": "Resource Routes", "state": "Efficient. Or a bot."},
+    {"name": "Combat Bots", "state": "Only light attacks. Always."},
+    {"name": "GPS-guided Players", "state": "No deviation from the path."},
+    {"name": "Silent Teammates", "state": "Focused or bot?"}
 ]
 
 BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8"
@@ -829,6 +843,10 @@ async def check_for_updates():
 
 @bot.event()
 async def on_ready():
+    # Need to import TextChannel for the isinstance check in on_message_create
+    global TextChannel
+    from interactions import TextChannel
+
     asyncio.create_task(rotate_funny_presence(bot, interval=60))
     asyncio.create_task(check_for_updates())
 
