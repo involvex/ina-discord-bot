@@ -335,8 +335,8 @@ async def addbuild(ctx, link: str, name: str, keyperks: str = None):
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds = json.load(f)
     except Exception:
-        builds = []
-    builds.append({"name": name, "link": link, "keyperks": perks_list})
+        builds = [] # Initialize as an empty list if file not found or error
+    builds.append({"name": name, "link": link, "keyperks": perks_list, "submitted_by": ctx.author.id})
     with open(BUILDS_FILE, 'w', encoding='utf-8') as f:
         json.dump(builds, f, indent=2)
     await ctx.send(f"Build '{name}' added!", ephemeral=True)
@@ -357,8 +357,16 @@ async def builds(ctx):
     embed.title = "Saved Builds"
     embed.color = 0x3498db
     for build in builds:
+        submitter_id = build.get('submitted_by')
+        submitter_mention = f"<@{submitter_id}>" if submitter_id else "Unknown User"
+        try:
+            if submitter_id:
+                user = await bot.fetch_user(submitter_id)
+                submitter_mention = user.mention if user else f"User ID: {submitter_id}"
+        except Exception: # Handle cases where user might not be fetchable
+            submitter_mention = f"User ID: {submitter_id}"
         perks = ', '.join(build.get('keyperks', [])) or '-'
-        embed.add_field(name=build['name'], value=f"[Link]({build['link']})\nKey Perks: {perks}", inline=False)
+        embed.add_field(name=build['name'], value=f"[Link]({build['link']})\nKey Perks: {perks}\nSubmitted by: {submitter_mention}", inline=False)
     await ctx.send(embeds=embed)
 
 
