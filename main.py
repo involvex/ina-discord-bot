@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.32" 
+__version__ = "0.2.33" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -328,8 +328,17 @@ async def nwdb_autocomplete(ctx):
         return
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     matches = [name for name in item_data.keys() if search_term in name]
+    
+    choices = []
+    for match_key in list(matches)[:25]:
+        # Assuming item_data[match_key] is a dict containing item details
+        # and has a field like 'Name' or 'name' for the display name.
+        # Fallback to title-cased key if specific name field isn't found.
+        item_details = item_data.get(match_key, {})
+        display_name = item_details.get('Name', item_details.get('name', match_key.title()))
+        choices.append({"name": display_name, "value": match_key}) # Send the key (lowercase) as value
+
     # Discord allows max 25 choices
-    choices = [{"name": name, "value": name} for name in list(matches)[:25]]
     await ctx.send(choices=choices)
 
 
