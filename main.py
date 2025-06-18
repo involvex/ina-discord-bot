@@ -1317,15 +1317,14 @@ SILLY_MENTION_RESPONSES = [
 
 # Mention handler
 @bot.event()
-async def on_message_create(event_name: str, event_data): # event_data is typically the Message object
-    # In v4 style, the second argument is usually the primary payload (e.g., Message object)
-    message = event_data 
-    
+async def on_message_create(event_name: str, message: Message):
+    """Handles new messages, specifically for bot mentions."""
+    # The 'message' argument is directly the Message object.
     if not message:
         return
     # Ensure message is a Message object, not a string or other type if dispatch is unexpected
     if not isinstance(message, Message):
-        logging.warning(f"on_message_create received unexpected event_data type: {type(event_data)}. Value: {event_data}")
+        logging.warning(f"on_message_create received unexpected message type: {type(message)}. Value: {message}")
         return
 
     author = getattr(message, "author", None)
