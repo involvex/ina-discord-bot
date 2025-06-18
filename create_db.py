@@ -36,7 +36,7 @@ def populate_db():
             if csv_data:
                 try:
                     # Use StringIO to read the CSV string data into pandas
-                    df = pd.read_csv(StringIO(csv_data))
+                    df = pd.read_csv(StringIO(csv_data), low_memory=False)
                     # Ensure column names are SQL-friendly (e.g., replace spaces with underscores)
                     df.columns = [col.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent') for col in df.columns]
                     df.to_sql(table_name, conn, if_exists="replace", index=False)

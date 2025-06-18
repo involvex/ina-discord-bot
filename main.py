@@ -9,8 +9,8 @@ import subprocess
 import platform # For OS detection
 import unicodedata
 import re
-import items
-import perks
+# import items # No longer needed for direct data loading
+# import perks # No longer needed for direct data loading
 from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
 from interactions.models.discord.channel import GuildText # For specific channel type checking
 from typing import Optional
@@ -21,8 +21,8 @@ import json
 from bs4 import BeautifulSoup
 import requests
 # In your main.py or a data_manager.py
-import sqlite3
-import os
+import sqlite3 # Added for DB interaction
+# import os # Already imported
 
 DB_NAME = "new_world_data.db" # Path to your SQLite DB
 
@@ -30,36 +30,41 @@ def get_db_connection():
     # Check if DB exists, if not, try to create it by calling populate_db()
     # This is a simplified check; you might want more robust logic
     if not os.path.exists(DB_NAME):
-        print(f"Database {DB_NAME} not found. Please run create_db.py first or integrate its logic.")
+        logging.critical(f"CRITICAL: Database '{DB_NAME}' not found. The bot cannot function without it. Please run 'create_db.py' to generate the database.")
         # You could attempt to run the population logic here if appropriate
         # from create_db import populate_db
         # populate_db() # This might be too slow/memory intensive for startup
+        # For now, we'll let it try to connect and fail if DB doesn't exist,
+        # or commands will handle the non-existence.
 
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row # To access columns by name
     return conn
 
-async def find_item_in_db(item_name_query: str):
+async def find_item_in_db(item_name_query: str, exact_match: bool = False):
     # Ensure DB exists before trying to connect
     if not os.path.exists(DB_NAME):
-        return None # Or an error message
+        logging.error(f"find_item_in_db: Database {DB_NAME} not found.")
+        return [] 
 
     conn = get_db_connection()
     results = []
     try:
         cursor = conn.cursor()
-        # Adjust table and column names based on your CSV and create_db.py script
-        # Example: Searching for an item by name in the 'items' table
-        # Ensure the column name 'name' matches what's in your CSV/DB
-        cursor.execute("SELECT * FROM items WHERE name LIKE ?", ('%' + item_name_query + '%',))
+        # Column names are sanitized by create_db.py (e.g., 'Item Name' -> 'Item_Name').
+        # We assume the primary human-readable name column is 'Name' after sanitization or was 'Name' in CSV.
+        if exact_match:
+             cursor.execute("SELECT * FROM items WHERE Name = ?", (item_name_query,))
+        else:
+             cursor.execute("SELECT * FROM items WHERE Name LIKE ?", ('%' + item_name_query + '%',))
         items = cursor.fetchall()
         results = [dict(row) for row in items]
     except sqlite3.Error as e:
-        print(f"SQLite error: {e}")
+        logging.error(f"SQLite error in find_item_in_db: {e}")
         # Handle specific errors, e.g., table not found if DB isn't populated
         if "no such table" in str(e):
-             print(f"Table not found. The database '{DB_NAME}' might be empty or not correctly populated.")
-        return None # Indicate error or no data
+             logging.error(f"Table 'items' not found in {DB_NAME}. Database might be empty or not correctly populated.")
+        return [] 
     finally:
         if conn:
             conn.close()
@@ -67,14 +72,38 @@ async def find_item_in_db(item_name_query: str):
 
 # Your command would then call find_item_in_db(item_name)
 
+# --- Function to find perks in DB ---
+async def find_perk_in_db(perk_name_query: str, exact_match: bool = False):
+    if not os.path.exists(DB_NAME):
+        logging.error(f"find_perk_in_db: Database {DB_NAME} not found.")
+        return []
+    conn = get_db_connection()
+    results = []
+    try:
+        cursor = conn.cursor()
+        # Assuming the main perk name column in perks.csv becomes 'Name' after sanitization by create_db.py.
+        if exact_match:
+            cursor.execute("SELECT * FROM perks WHERE Name = ?", (perk_name_query,))
+        else:
+            cursor.execute("SELECT * FROM perks WHERE Name LIKE ?", ('%' + perk_name_query + '%',))
+        perks_data = cursor.fetchall()
+        results = [dict(row) for row in perks_data]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error in find_perk_in_db: {e}")
+        if "no such table" in str(e):
+            logging.error(f"Table 'perks' not found in {DB_NAME}. Database might be empty or not correctly populated.")
+        return []
+    finally:
+        if conn:
+            conn.close()
+    return results
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
 import datetime # For timestamps in logs
-
 load_dotenv()
 
-__version__ = "0.2.50" 
+__version__ = "0.2.51" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -115,9 +144,9 @@ NEW_WORLD_WELCOME_MESSAGES = [
 ]
 
 # --- Global Data Stores ---
-ITEM_DATA = {}
-ALL_PERKS_DATA = {}
-ITEM_ID_TO_NAME_MAP = {} # For mapping Item IDs to Names
+# ITEM_DATA = {} # Replaced by SQLite DB
+# ALL_PERKS_DATA = {} # Replaced by SQLite DB
+# ITEM_ID_TO_NAME_MAP = {} # Replaced by SQLite DB queries or direct recipe data
 
 # --- Master Settings Helper Functions ---
 def load_master_settings():
@@ -362,113 +391,119 @@ async def calculate(ctx, expression: str):
 @slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
 async def nwdb(ctx, item_name: str):
     await ctx.defer() # Defer the response immediately
-    # Load items from CSV
-    # item_data = items.load_items_from_csv('items.csv') # No longer load here
-    if not ITEM_DATA:
-        await ctx.send("Item data is not loaded. Please try again later or contact an admin.", ephemeral=True)
-        return
-    item_name_lower = item_name.lower()
-    if item_name_lower not in ITEM_DATA:
-        await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
-        return
-    item = ITEM_DATA[item_name_lower]
-    def get_any(item, keys, default):
-        for k in keys:
-            if k in item and item[k]:
-                return item[k]
-        return default
-    name = get_any(item, ['name', 'Name', 'Item Name'], item_name)
-    item_id_for_url = get_any(item, ['Item ID', 'item_id'], None)
 
-    description = get_any(item, ['description', 'Description', 'Flavor Text'], 'No description available.')
-    rarity = get_any(item, ['rarity', 'Rarity'], 'Unknown')
-    tier = get_any(item, ['tier', 'Tier'], 'Unknown')
-    icon_url = get_any(item, ['icon', 'Icon', 'Icon Path', 'icon_url'], None)
+    item_results = await find_item_in_db(item_name, exact_match=True) # Autocomplete should give an exact name
+
+    if not item_results:
+        # Fallback to a LIKE search if exact match (from potential direct input) fails
+        item_results = await find_item_in_db(item_name, exact_match=False)
+        if not item_results:
+            await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
+            return
+    
+    item = item_results[0] # Take the first match
+
+    def get_any(item_dict, keys, default):
+        for k_csv_original in keys:
+            # Sanitize k_csv_original the same way create_db.py does for column names
+            k_db = k_csv_original.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent')
+            if k_db in item_dict and item_dict[k_db] is not None:
+                return item_dict[k_db]
+        return default
+
+    name = get_any(item, ['Name', 'name'], item_name) # 'Name' is likely the sanitized column
+    item_id_for_url = get_any(item, ['Item ID', 'ItemID'], None) # Becomes 'Item_ID' or 'ItemID'
+    description = get_any(item, ['Description', 'description', 'Flavor Text'], 'No description available.') # 'Flavor_Text'
+    rarity = get_any(item, ['Rarity', 'rarity'], 'Unknown')
+    tier = get_any(item, ['Tier', 'tier'], 'Unknown')
+    icon_url = get_any(item, ['Icon', 'icon', 'Icon Path'], None) # 'Icon_Path'
     
     # Build a NWDB-style embed
     embed = Embed()
     embed.title = name
     if item_id_for_url:
-        embed.url = f"https://nwdb.info/db/item/{item_id_for_url}"
+        # Ensure item_id_for_url is stripped of any potential non-URL safe characters if necessary,
+        # though typically Item IDs are safe.
+        embed.url = f"https://nwdb.info/db/item/{str(item_id_for_url).strip()}"
     else:
         logging.warning(f"Could not find Item ID for '{name}' to create NWDB link.")
 
-    embed.color = 0x9b59b6 if rarity.lower() == 'artifact' else 0x7289da
+    embed.color = 0x9b59b6 if str(rarity).lower() == 'artifact' else 0x7289da # Ensure rarity is string for .lower()
     if icon_url:
-        embed.set_thumbnail(url=icon_url)
-    embed.add_field(name="Rarity", value=rarity, inline=True)
-    embed.add_field(name="Tier", value=tier, inline=True)
-    if description and not description.startswith('Artifact_'):
-        embed.add_field(name="Description", value=description, inline=False)
-    # Add more NWDB-style fields if available
-    # Example: Gear Score, Perks, etc.
-    gear_score = get_any(item, ['gear_score', 'Gear Score', 'GS'], None)
+        embed.set_thumbnail(url=str(icon_url).strip()) # Ensure URL is string and stripped
+    embed.add_field(name="Rarity", value=str(rarity), inline=True)
+    embed.add_field(name="Tier", value=str(tier), inline=True)
+    if description and not str(description).startswith('Artifact_'): # Ensure description is string
+        embed.add_field(name="Description", value=str(description), inline=False)
+    
+    gear_score = get_any(item, ['Gear Score', 'gear_score', 'GS'], None) # Becomes 'Gear_Score'
     if gear_score:
         embed.add_field(name="Gear Score", value=str(gear_score), inline=True)
+    
     # Perks (if present)
-    perks = get_any(item, ['perks', 'Perks'], None)
-    # Perk pretty names and icons mapping (expand as needed)
-    PERK_PRETTY = {
+    perks_raw = get_any(item, ['Perks', 'perks'], None) # This column might contain perk IDs or names
+    PERK_PRETTY = { # This map might need to be more dynamic or comprehensive
         'PerkID_Artifact_Set1_HeavyChest': ("Artifact Set: Heavy Chest", "🟣"),
         'PerkID_Gem_EmptyGemSlot': ("Empty Gem Slot", "💠"),
-        'PerkID_Armor_DefBasic': ("Basic Defense", "🛡️"),
-        'PerkID_Armor_RangeDefense_Physical': ("Ranged Physical Defense", "🏹"),
-        # Add more known perks here...
+        # ... more perk mappings
     }
-    if perks:
+    if perks_raw:
         perk_lines = []
-        for perk in str(perks).split(","):
-            perk = perk.strip()
-            if not perk:
+        for perk_entry in str(perks_raw).split(","): # Ensure perks_raw is string
+            perk_entry = perk_entry.strip()
+            if not perk_entry:
                 continue
-            pretty, icon = PERK_PRETTY.get(perk, (perk, '•'))
+            # Here, perk_entry might be a PerkID. You might need to look up its display name from the 'perks' table
+            # For simplicity, using PERK_PRETTY or just the ID if not found.
+            pretty, icon = PERK_PRETTY.get(perk_entry, (perk_entry, '•'))
             perk_lines.append(f"{icon} {pretty}")
         if perk_lines:
             embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
-    # If item is craftable, mention calculate_craft
-    if get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP):
-        embed.set_footer(text=f"Type /calculate_craft item_name:{item_name} amount:4 to calculate resources!")
+
+    # Check if item is craftable by querying the recipes table
+    conn_check = get_db_connection()
+    is_craftable = False
+    try:
+        cursor_check = conn_check.cursor()
+        # Use LIKE for item_name as recipe names might have slight variations or casing differences
+        # Ensure 'output_item_name' is the correct column in your 'recipes' table
+        cursor_check.execute("SELECT 1 FROM recipes WHERE output_item_name LIKE ?", (f'%{name}%',))
+        if cursor_check.fetchone():
+            is_craftable = True
+    except sqlite3.Error as e:
+        logging.warning(f"Could not check if item {name} is craftable due to DB error: {e}")
+    finally:
+        if conn_check:
+            conn_check.close()
+
+    if is_craftable:
+        # Using f-string for item_name to ensure it's correctly part of the command example
+        embed.set_footer(text=f"Type /calculate_craft item_name:\"{name}\" to calculate resources!")
     await ctx.send(embeds=embed)
 
 
 @nwdb.autocomplete("item_name")
-async def nwdb_autocomplete(ctx):
-    # Provide autocomplete suggestions from items.csv
-    if not ITEM_DATA:
-        await ctx.send(choices=[])
-        return
-
+async def nwdb_autocomplete(ctx: SlashContext): # Added type hint for ctx
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-
-    if not search_term: # If search term is empty, send no choices or a placeholder
+    if not search_term: # If search term is empty, send no choices
         await ctx.send(choices=[])
-        # Or, send a placeholder:
-        # await ctx.send(choices=[{"name": "Type an item name to search...", "value": "_placeholder_"}])
         return
 
-    # Optimization: If search term is very short, it might still be too many matches.
-    # For example, limit search if term is less than 2 or 3 characters.
-    # For now, we'll proceed with the search but this is an area for further optimization if needed.
-
-    matches_keys = []
-    # ITEM_DATA.keys() are already lowercase
-    for item_key_lower in ITEM_DATA.keys():
-        if search_term in item_key_lower:
-            matches_keys.append(item_key_lower)
-            if len(matches_keys) >= 25: # Limit to 25 matches early
-                break
-
+    conn = get_db_connection()
     choices = []
-    for match_key_lower in matches_keys: # Iterate only up to 25 found matches
-        # Assuming item_data[match_key] is a dict containing item details
-        # and has a field like 'Name' or 'name' for the display name.
-        # Fallback to title-cased key if specific name field isn't found.
-        item_details = ITEM_DATA.get(match_key_lower, {})
-        # Use the 'name' field from the loaded item_data which should have original casing
-        display_name = item_details.get('Name', item_details.get('name', match_key_lower.title()))
-        choices.append({"name": display_name, "value": match_key_lower}) # Send the key (lowercase) as value
-
-    # Discord allows max 25 choices
+    try:
+        cursor = conn.cursor()
+        # Query the 'Name' column from the 'items' table. Adjust if your column name differs.
+        # create_db.py sanitizes column names, so 'Name' should be correct if original was 'Name' or 'name'.
+        cursor.execute("SELECT Name FROM items WHERE lower(Name) LIKE ? LIMIT 25", ('%' + search_term + '%',))
+        matches = cursor.fetchall()
+        # The value sent to the command should be the exact item name for easier lookup
+        choices = [{"name": row["Name"], "value": row["Name"]} for row in matches]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error in nwdb_autocomplete: {e}")
+    finally:
+        if conn:
+            conn.close()
     await ctx.send(choices=choices)
 
 @slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
@@ -476,14 +511,22 @@ async def nwdb_autocomplete(ctx):
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
     await ctx.defer() # Defer response
-    recipe = get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP)
-    if not recipe:
-        await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
+    # IMPORTANT: get_recipe and calculate_crafting_materials in recipes.py
+    # MUST be adapted to query the SQLite database instead of using in-memory dicts.
+    # The following calls assume recipes.py has been updated.
+    
+    # Assuming get_recipe is adapted to use the database and returns a dict or None
+    # This function needs to query DB_NAME (logic would be in recipes.py)
+    recipe_details = get_recipe(item_name) 
+
+    if not recipe_details: # If get_recipe returns None or empty
+        await ctx.send(f"Recipe for '{item_name}' not found or item is not craftable.", ephemeral=True)
         return
+    
     # Show all resources, including intermediates
-    all_materials = calculate_crafting_materials(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP, amount or 1, include_intermediate=True)
-    if not all_materials:
-        await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
+    all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True) # This function also needs to be adapted in recipes.py to use the DB
+    if not all_materials: # If calculate_crafting_materials returns None or empty
+        await ctx.send(f"Could not calculate materials for '{item_name}'. Ensure it's a craftable item with a known recipe.", ephemeral=True)
         return
     lines = [f"To craft {amount or 1} **{item_name.title()}** you need (including intermediates):"]
     for mat, qty in all_materials.items():
@@ -492,22 +535,28 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
 
 
 @calculate_craft.autocomplete("item_name")
-async def calculate_craft_autocomplete(ctx):
+async def calculate_craft_autocomplete(ctx: SlashContext): # Added type hint
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
 
     if not search_term:
         await ctx.send(choices=[])
         return
 
+    conn = get_db_connection()
     matches = []
-    # RECIPES keys are already lowercase if defined consistently
-    for recipe_key_lower in RECIPES.keys():
-        if search_term in recipe_key_lower:
-            matches.append(recipe_key_lower)
-            if len(matches) >= 25:
-                break
-    
-    choices = [{"name": name.title(), "value": name} for name in matches]
+    try:
+        cursor = conn.cursor()
+        # Query 'output_item_name' from the 'recipes' table. This column is defined in create_db.py.
+        cursor.execute("SELECT output_item_name FROM recipes WHERE lower(output_item_name) LIKE ? LIMIT 25", ('%' + search_term + '%',))
+        db_matches = cursor.fetchall()
+        # Ensure output_item_name is correctly cased for display and as the value.
+        matches = [row["output_item_name"] for row in db_matches]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error in calculate_craft_autocomplete: {e}")
+    finally:
+        if conn:
+            conn.close()
+    choices = [{"name": name, "value": name} for name in matches]
     await ctx.send(choices=choices)
 
 
@@ -516,69 +565,78 @@ async def calculate_craft_autocomplete(ctx):
 async def recipe(ctx, item_name: str):
     await ctx.defer() # Defer response
 
-    from recipes import get_recipe, fetch_recipe_from_nwdb, track_recipe
-    recipe = get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP)
-    if not recipe:
-        # Try to fetch from nwdb.info
-        recipe = fetch_recipe_from_nwdb(item_name)
-        if not recipe:
-            await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
-            return
-        else:
-            await ctx.send(f"Recipe for '{item_name}' fetched from nwdb.info.")
-    # Track the recipe for the user
-    user_id = str(ctx.author.id)
-    track_recipe(user_id, item_name, recipe)
-    embed = Embed()
-    embed.title = f"Recipe: {item_name.title()}"
-    embed.color = 0x9b59b6
-    embed.add_field(name="Station", value=recipe.get("station", "-"), inline=True)
-    embed.add_field(name="Skill", value=f"{recipe.get('skill', '-')}" , inline=True)
-    embed.add_field(name="Skill Level", value=str(recipe.get("skill_level", "-")), inline=True)
-    embed.add_field(name="Tier", value=str(recipe.get("tier", "-")), inline=True)
-    # Ingredients breakdown
-    ing_lines = []
-    for ing in recipe.get("ingredients", []):
-        ing_lines.append(f"• {ing['quantity']} {ing['item']}")
-    
-    # Add NWDB link for the crafted item
-    item_details_for_recipe = ITEM_DATA.get(item_name.lower())
-    if item_details_for_recipe:
-        item_id_for_url = item_details_for_recipe.get('Item ID')
-        if item_id_for_url:
-            embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/item/{item_id_for_url})", inline=False)
+    # track_recipe might need adaptation if it relies on the old global data structures.
+    from recipes import track_recipe # Assuming track_recipe is adapted or its usage is reviewed
 
-    embed.add_field(name="Ingredients", value="\n".join(ing_lines) or "-", inline=False)
+    conn = get_db_connection()
+    recipe_json_str = None
+    try:
+        cursor = conn.cursor()
+        # Fetch the 'raw_recipe_data' which stores the full recipe JSON.
+        # Use LIKE for item_name to be more flexible with user input.
+        # Prioritize exact match first if possible, or ensure autocomplete sends exact names.
+        # For simplicity here, LIKE is used.
+        cursor.execute("SELECT raw_recipe_data FROM recipes WHERE output_item_name LIKE ?", (f'%{item_name}%',))
+        row = cursor.fetchone()
+        if row:
+            recipe_json_str = row["raw_recipe_data"]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error fetching recipe for '{item_name}': {e}")
+    finally:
+        if conn:
+            conn.close()
+
+    if not recipe_json_str:
+        # Optionally, you could still call fetch_recipe_from_nwdb here as a fallback
+        # from recipes import fetch_recipe_from_nwdb
+        # recipe_dict = fetch_recipe_from_nwdb(item_name) # This would need to be async or run in executor
+        # if not recipe_dict:
+        await ctx.send(f"No recipe found for '{item_name}' in the local database.", ephemeral=True)
+        return
+        # else:
+        #     await ctx.send(f"Recipe for '{item_name}' fetched from nwdb.info (external).") # If fetched
+
+    try:
+        recipe_dict = json.loads(recipe_json_str)
+    except json.JSONDecodeError:
+        logging.error(f"Failed to parse recipe JSON for '{item_name}' from database.")
+        await ctx.send(f"Error retrieving recipe details for '{item_name}'.", ephemeral=True)
+        return
+
+    # Track the recipe for the user - ensure track_recipe is adapted for DB if it writes data
+    user_id = str(ctx.author.id)
+    track_recipe(user_id, item_name, recipe_dict) # Review track_recipe for DB compatibility
+
+    embed = Embed()
+    # Use .get() with a fallback to item_name for title, and .title() for consistent casing
+    embed.title = f"Recipe: {recipe_dict.get('output_item_name', item_name).title()}"
+    embed.color = 0x9b59b6 # Purple
+    embed.add_field(name="Station", value=str(recipe_dict.get("station", "-")), inline=True)
+    embed.add_field(name="Skill", value=str(recipe_dict.get('skill', "-")) , inline=True)
+    embed.add_field(name="Skill Level", value=str(recipe_dict.get("skill_level", "-")), inline=True)
+    embed.add_field(name="Tier", value=str(recipe_dict.get("tier", "-")), inline=True)
+    
+    ing_lines = []
+    for ing in recipe_dict.get("ingredients", []):
+        # Ensure quantity and item name are present and stringified
+        ing_lines.append(f"• {ing.get('quantity', '?')} {str(ing.get('item', 'Unknown Ingredient'))}")
+    embed.add_field(name="Ingredients", value="\n".join(ing_lines) if ing_lines else "-", inline=False)
+
+    # Add NWDB link for the crafted item by looking up its Item ID from the 'items' table
+    crafted_item_name = recipe_dict.get('output_item_name', item_name)
+    item_details_for_recipe = await find_item_in_db(crafted_item_name, exact_match=True)
+    if item_details_for_recipe:
+        item_id_for_url = item_details_for_recipe[0].get('Item_ID') # 'Item_ID' from sanitized 'Item ID'
+        if item_id_for_url:
+            embed.add_field(name="NWDB Link (Crafted Item)", value=f"[View on NWDB](https://nwdb.info/db/item/{str(item_id_for_url).strip()})", inline=False)
+
     await ctx.send(embeds=embed)
 
 
 @recipe.autocomplete("item_name")
-async def recipe_autocomplete(ctx):
-    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-
-    if not ITEM_DATA:
-        await ctx.send(choices=[])
-        return
-    
-    if not search_term:
-        await ctx.send(choices=[])
-        return
-
-    matches_keys = []
-    for item_key_lower in ITEM_DATA.keys(): # ITEM_DATA keys are already lowercase
-        # We also want to check if the item is in RECIPES, as /recipe is for craftable items
-        if search_term in item_key_lower and (item_key_lower in RECIPES or get_recipe(item_key_lower, ITEM_DATA, ITEM_ID_TO_NAME_MAP)): # Check if a recipe exists
-            matches_keys.append(item_key_lower)
-            if len(matches_keys) >= 25:
-                break
-
-    choices = []
-    for match_key_lower in matches_keys:
-        item_details = ITEM_DATA.get(match_key_lower, {})
-        display_name = item_details.get('Name', item_details.get('name', match_key_lower.title()))
-        choices.append({"name": display_name, "value": match_key_lower})
-
-    await ctx.send(choices=choices)
+async def recipe_autocomplete(ctx: SlashContext): # Added type hint
+    # This can reuse the logic from calculate_craft_autocomplete as both search craftable items
+    await calculate_craft_autocomplete(ctx)
 
 # --- Build Management Commands ---
 @slash_command(name="build", description="Manage saved New World builds.")
@@ -721,44 +779,47 @@ async def build_remove_autocomplete(ctx: SlashContext):
     autocomplete=True
 )
 async def perk_command(ctx, perk_name: str):
-    # all_perks_data = perks.load_perks_from_csv() # No longer load here
-    if not ALL_PERKS_DATA:
-        await ctx.send("Perk data is not loaded. Please try again later or contact an admin.", ephemeral=True)
-        return
+    await ctx.defer() # Defer as DB query might take a moment
 
-    perk_name_lower = perk_name.lower()
-    if perk_name_lower not in ALL_PERKS_DATA:
-        await ctx.send(f"Perk '{perk_name}' not found in the database.", ephemeral=True)
-        return
+    perk_results = await find_perk_in_db(perk_name, exact_match=True) 
 
-    perk_info = ALL_PERKS_DATA[perk_name_lower]
+    if not perk_results:
+        perk_results = await find_perk_in_db(perk_name, exact_match=False) # Fallback for direct input
+        if not perk_results:
+            await ctx.send(f"Perk '{perk_name}' not found in the database.", ephemeral=True)
+            return
+    
+    perk_info = perk_results[0] # Take the first match
 
-    # Helper to get values safely, similar to the one in /nwdb
-    def get_any_perk_info(data, keys, default):
-        for k_csv in keys: # CSV headers can have varied casing
-            for actual_key_in_data in data.keys():
-                if actual_key_in_data.lower() == k_csv.lower():
-                    if data[actual_key_in_data]:
-                        return data[actual_key_in_data]
+    def get_any_perk_info(data_dict, keys, default):
+        for k_csv_original in keys:
+            # Sanitize k_csv_original the same way create_db.py does for column names
+            k_db = k_csv_original.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent')
+            if k_db in data_dict and data_dict[k_db] is not None:
+                return data_dict[k_db]
         return default
 
-    name = get_any_perk_info(perk_info, ['name', 'perkname'], perk_name)
-    description = get_any_perk_info(perk_info, ['description', 'desc'], 'No description available.')
-    perk_type = get_any_perk_info(perk_info, ['type', 'perktype', 'category'], 'Unknown Type')
-    icon_url = get_any_perk_info(perk_info, ['icon_url', 'icon'], None)
-    perk_id = get_any_perk_info(perk_info, ['id', 'perkid'], None)
+    # Use sanitized key names based on create_db.py logic
+    name = get_any_perk_info(perk_info, ['Name', 'PerkName'], perk_name) # 'Name' or 'PerkName'
+    description = get_any_perk_info(perk_info, ['Description', 'Desc'], 'No description available.')
+    perk_type = get_any_perk_info(perk_info, ['Type', 'PerkType', 'Category'], 'Unknown Type') # 'PerkType'
+    icon_url = get_any_perk_info(perk_info, ['Icon', 'IconPath', 'icon_url'], None) # 'IconPath' or 'icon_url' from scrape_perks
+    perk_id = get_any_perk_info(perk_info, ['PerkID', 'ID', 'id'], None) # 'PerkID' or 'id' from scrape_perks
 
-    embed = Embed(title=name, color=0x1ABC9C) # A teal color for perks
+    embed = Embed(title=str(name), color=0x1ABC9C) # Teal
     if icon_url:
-        embed.set_thumbnail(url=icon_url)
+        embed.set_thumbnail(url=str(icon_url).strip())
 
-    embed.add_field(name="Description", value=description, inline=False)
-    embed.add_field(name="Type", value=perk_type, inline=True)
+    # Scale description if applicable (ensure scale_value_with_gs is robust)
+    scaled_description = scale_value_with_gs(str(description)) # Ensure description is string
+    embed.add_field(name="Description", value=scaled_description, inline=False)
+    embed.add_field(name="Type", value=str(perk_type), inline=True)
 
     if perk_id:
-        embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/perk/{perk_id})", inline=True)
+        embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/perk/{str(perk_id).strip()})", inline=True)
     else:
-        embed.add_field(name="ID", value="Not available", inline=True)
+        # If PerkID is not directly available, you might try to construct a search link
+        embed.add_field(name="NWDB Link", value="ID not available for direct link", inline=True)
 
     embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
     await ctx.send(embeds=embed)
@@ -808,35 +869,32 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
     return re.sub(r'\$\{(.*?)\}', replace_match, base_value)
 
 @perk_command.autocomplete("perk_name")
-async def perk_autocomplete(ctx):
-    # all_perks_data = perks.load_perks_from_csv() # No longer load here
-    if not ALL_PERKS_DATA:
+async def perk_autocomplete(ctx: SlashContext): # Added type hint
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    if not search_term:
         await ctx.send(choices=[])
         return
 
-    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-    
-    # Match against the keys of all_perks_data (which are lowercase perk names)
-    # Then retrieve the original display name from the 'name' field in the perk's data for the choice's name
-    matches = []
-    for perk_key_lower, perk_data_dict in ALL_PERKS_DATA.items():
-        if search_term in perk_key_lower:
-            # Try to get the original cased name for display
-            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title()))
-            matches.append({"name": display_name, "value": display_name}) # Send original cased name as value too
-
-    # Ensure unique choices by name (in case of slight variations leading to same display name)
-    # and limit to 25
-    unique_matches = []
-    seen_names = set()
-    for match in matches:
-        if match["name"] not in seen_names:
-            unique_matches.append(match)
-            seen_names.add(match["name"])
-        if len(unique_matches) >= 25:
-            break
-            
-    await ctx.send(choices=unique_matches)
+    conn = get_db_connection()
+    choices = []
+    try:
+        cursor = conn.cursor()
+        # Query the 'Name' column from the 'perks' table. Adjust if your column name differs.
+        # This assumes create_db.py stores the main perk name under a column like 'Name'.
+        # The name from perks_scraped.csv is stored as 'name' by create_db.py if the CSV header is 'name'.
+        # If create_db.py uses pandas and the CSV header is 'name', the SQL column will be 'name'.
+        # If CSV header is 'Name', SQL column will be 'Name'.
+        # Let's assume 'Name' is the target column name after sanitization or original.
+        cursor.execute("SELECT Name FROM perks WHERE lower(Name) LIKE ? LIMIT 25", ('%' + search_term + '%',))
+        db_matches = cursor.fetchall()
+        # The value sent to the command should be the exact perk name for easier lookup
+        choices = [{"name": row["Name"], "value": row["Name"]} for row in db_matches]
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error in perk_autocomplete: {e}")
+    finally:
+        if conn:
+            conn.close()
+    await ctx.send(choices=choices)
 
 
 @slash_command(name="about", description="Show information about Ina's New World Bot.")
@@ -1564,37 +1622,24 @@ async def check_for_updates():
         await asyncio.sleep(UPDATE_CHECK_INTERVAL_SECONDS)
 
 def load_all_game_data():
-    """Loads all necessary game data from CSV files into global variables."""
-    global ITEM_DATA, ALL_PERKS_DATA, ITEM_ID_TO_NAME_MAP
-    logging.info("Starting to load game data...")
+    """
+    Ensures the SQLite database file exists.
+    The actual data loading into the DB is handled by create_db.py.
+    """
+    # global ITEM_DATA, ALL_PERKS_DATA, ITEM_ID_TO_NAME_MAP # These are no longer used
+    logging.info("Verifying game data source (SQLite Database)...")
 
-    # Define remote URLs for data files
-    items_csv_source = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv"
-    # Assuming perks.csv is also hosted, replace with its actual URL or keep local path if necessary
-    perks_csv_source = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks.csv" # Placeholder URL
-    # perks_csv_source = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'perks.csv') # If perks.csv remains local
-
-    ITEM_DATA = items.load_items_from_csv(items_csv_source)
-    if not ITEM_DATA:
-        logging.error(f"CRITICAL: Failed to load item_data from {items_csv_source}! Item-related commands will fail.")
-        ITEM_DATA = {} # Ensure it's an empty dict if loading fails
-        ITEM_ID_TO_NAME_MAP = {}
+    if not os.path.exists(DB_NAME):
+        logging.critical(
+            f"CRITICAL: Database file '{DB_NAME}' not found. "
+            f"The bot relies on this database for item, perk, and recipe data. "
+            f"Please run 'python create_db.py' to generate or update the database before starting the bot."
+        )
+        # Consider exiting if the DB is essential for core functionality:
+        # sys.exit(f"Database {DB_NAME} not found. Bot cannot start.")
     else:
-        logging.info(f"Successfully loaded {len(ITEM_DATA)} items from {items_csv_source}.")
-        # Populate ITEM_ID_TO_NAME_MAP
-        ITEM_ID_TO_NAME_MAP = {
-            row.get('Item ID'): row.get('Name') # Assuming 'Name' is the original cased name column
-            for row in ITEM_DATA.values()
-            if row.get('Item ID') and row.get('Name')
-        }
-        logging.info(f"Successfully created ITEM_ID_TO_NAME_MAP with {len(ITEM_ID_TO_NAME_MAP)} entries.")
+        logging.info(f"Database '{DB_NAME}' found. Bot will use it for data lookups.")
 
-    ALL_PERKS_DATA = perks.load_perks_from_csv(perks_csv_source) # Pass the source (URL or path)
-    if not ALL_PERKS_DATA:
-        logging.error(f"CRITICAL: Failed to load all_perks_data from {perks_csv_source}! Perk-related commands will fail.")
-        ALL_PERKS_DATA = {} # Ensure it's an empty dict
-    else:
-        logging.info(f"Successfully loaded {len(ALL_PERKS_DATA)} perks from {perks_csv_source}.")
     logging.info("Game data loading process complete.")
 
 @bot.event()
