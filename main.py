@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.27" 
+__version__ = "0.2.29" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -205,8 +205,25 @@ async def help_command(ctx, command: Optional[str] = None):
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
     else:
-        help_text = "\n".join([f"**/{cmd}**: {desc}" for cmd, desc in commands.items()])
-        await ctx.send(f"**Ina's New World Bot Commands:**\n{help_text}")
+        header = "**Ina's New World Bot Commands:**\n"
+        full_help_text = header
+        current_page_lines = []
+
+        for cmd, desc in commands.items():
+            line = f"**/{cmd}**: {desc}"
+            # Check if adding the next line would exceed the limit (approximate)
+            # 2000 - current_page_length - new_line_length - buffer for markdown/etc.
+            if len(full_help_text) + len("\n".join(current_page_lines)) + len(line) + 50 > 1950: # 1950 to be safe
+                await ctx.send(full_help_text + "\n".join(current_page_lines))
+                current_page_lines = [line] # Start new page
+                full_help_text = "" # Reset header for subsequent pages if needed, or add (continued)
+            else:
+                current_page_lines.append(line)
+        
+        # Send any remaining lines
+        if current_page_lines:
+            await ctx.send(full_help_text + "\n".join(current_page_lines))
+
 
 
 @slash_command("petpet", description="Give a New World petting ritual to a user!")
