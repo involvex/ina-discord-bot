@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.39" 
+__version__ = "0.2.41" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -70,6 +70,7 @@ NEW_WORLD_WELCOME_MESSAGES = [
 # --- Global Data Stores ---
 ITEM_DATA = {}
 ALL_PERKS_DATA = {}
+ITEM_ID_TO_NAME_MAP = {} # For mapping Item IDs to Names
 
 # --- Master Settings Helper Functions ---
 def load_master_settings():
@@ -279,13 +280,21 @@ async def nwdb(ctx, item_name: str):
                 return item[k]
         return default
     name = get_any(item, ['name', 'Name', 'Item Name'], item_name)
+    item_id_for_url = get_any(item, ['Item ID', 'item_id'], None)
+
     description = get_any(item, ['description', 'Description', 'Flavor Text'], 'No description available.')
     rarity = get_any(item, ['rarity', 'Rarity'], 'Unknown')
     tier = get_any(item, ['tier', 'Tier'], 'Unknown')
     icon_url = get_any(item, ['icon', 'Icon', 'Icon Path', 'icon_url'], None)
+    
     # Build a NWDB-style embed
     embed = Embed()
     embed.title = name
+    if item_id_for_url:
+        embed.url = f"https://nwdb.info/db/item/{item_id_for_url}"
+    else:
+        logging.warning(f"Could not find Item ID for '{name}' to create NWDB link.")
+
     embed.color = 0x9b59b6 if rarity.lower() == 'artifact' else 0x7289da
     if icon_url:
         embed.set_thumbnail(url=icon_url)
@@ -319,7 +328,7 @@ async def nwdb(ctx, item_name: str):
         if perk_lines:
             embed.add_field(name="Perks", value="\n".join(perk_lines), inline=False)
     # If item is craftable, mention calculate_craft
-    if get_recipe(item_name, ITEM_DATA):
+    if get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP):
         embed.set_footer(text=f"Type /calculate_craft item_name:{item_name} amount:4 to calculate resources!")
     await ctx.send(embeds=embed)
 
@@ -369,12 +378,12 @@ async def nwdb_autocomplete(ctx):
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 async def calculate_craft(ctx, item_name: str, amount: int = 1):
     await ctx.defer() # Defer response
-    recipe = get_recipe(item_name, ITEM_DATA)
+    recipe = get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP)
     if not recipe:
         await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
         return
     # Show all resources, including intermediates
-    all_materials = calculate_crafting_materials(item_name, ITEM_DATA, amount or 1, include_intermediate=True)
+    all_materials = calculate_crafting_materials(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP, amount or 1, include_intermediate=True)
     if not all_materials:
         await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
         return
@@ -410,7 +419,7 @@ async def recipe(ctx, item_name: str):
     await ctx.defer() # Defer response
 
     from recipes import get_recipe, fetch_recipe_from_nwdb, track_recipe
-    recipe = get_recipe(item_name, ITEM_DATA)
+    recipe = get_recipe(item_name, ITEM_DATA, ITEM_ID_TO_NAME_MAP)
     if not recipe:
         # Try to fetch from nwdb.info
         recipe = fetch_recipe_from_nwdb(item_name)
@@ -433,6 +442,14 @@ async def recipe(ctx, item_name: str):
     ing_lines = []
     for ing in recipe.get("ingredients", []):
         ing_lines.append(f"• {ing['quantity']} {ing['item']}")
+    
+    # Add NWDB link for the crafted item
+    item_details_for_recipe = ITEM_DATA.get(item_name.lower())
+    if item_details_for_recipe:
+        item_id_for_url = item_details_for_recipe.get('Item ID')
+        if item_id_for_url:
+            embed.add_field(name="NWDB Link", value=f"[View on NWDB](https://nwdb.info/db/item/{item_id_for_url})", inline=False)
+
     embed.add_field(name="Ingredients", value="\n".join(ing_lines) or "-", inline=False)
     await ctx.send(embeds=embed)
 
@@ -452,7 +469,7 @@ async def recipe_autocomplete(ctx):
     matches_keys = []
     for item_key_lower in ITEM_DATA.keys(): # ITEM_DATA keys are already lowercase
         # We also want to check if the item is in RECIPES, as /recipe is for craftable items
-        if search_term in item_key_lower and (item_key_lower in RECIPES or get_recipe(item_key_lower, ITEM_DATA)): # Check if a recipe exists
+        if search_term in item_key_lower and (item_key_lower in RECIPES or get_recipe(item_key_lower, ITEM_DATA, ITEM_ID_TO_NAME_MAP)): # Check if a recipe exists
             matches_keys.append(item_key_lower)
             if len(matches_keys) >= 25:
                 break
@@ -1215,10 +1232,15 @@ async def on_message_delete(event_name: str, message: Message):
     await _log_server_activity(str(message.guild.id), embed)
 
 @bot.event()
-async def on_message_update(event_name: str, before: Optional[Message], after: Message):
+async def on_message_update(event_name: str, before: Optional[Message] = None, after: Optional[Message] = None):
     # Defensive checks for types, as the original error implies _args might be empty for this event
-    if not isinstance(after, Message):
-        logging.error(f"on_message_update: 'after' is not a Message object. Type: {type(after)}, Value: {after}. This indicates a library dispatch issue.")
+    if not after:
+        logging.warning(f"on_message_update for event '{event_name}' called without 'after' message. Before: {before}. This may indicate a library dispatch issue or an event without an 'after' payload.")
+        return
+    
+    # Ensure 'after' is a Message object if it was provided
+    if not isinstance(after, Message): # This check might be redundant if the above 'if not after:' catches it.
+        logging.error(f"on_message_update: 'after' (value: {after}) is not a Message object. Type: {type(after)}. This indicates a library dispatch issue.")
         return
     if before is not None and not isinstance(before, Message):
         logging.warning(f"on_message_update: 'before' is not None and not a Message object. Type: {type(before)}, Value: {before}")
@@ -1445,7 +1467,7 @@ async def check_for_updates():
 
 def load_all_game_data():
     """Loads all necessary game data from CSV files into global variables."""
-    global ITEM_DATA, ALL_PERKS_DATA
+    global ITEM_DATA, ALL_PERKS_DATA, ITEM_ID_TO_NAME_MAP
     logging.info("Starting to load game data...")
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -1456,8 +1478,16 @@ def load_all_game_data():
     if not ITEM_DATA:
         logging.error(f"CRITICAL: Failed to load item_data from {items_csv_path}! Item-related commands will fail.")
         ITEM_DATA = {} # Ensure it's an empty dict if loading fails
+        ITEM_ID_TO_NAME_MAP = {}
     else:
         logging.info(f"Successfully loaded {len(ITEM_DATA)} items from {items_csv_path}.")
+        # Populate ITEM_ID_TO_NAME_MAP
+        ITEM_ID_TO_NAME_MAP = {
+            row.get('Item ID'): row.get('Name') # Assuming 'Name' is the original cased name column
+            for row in ITEM_DATA.values()
+            if row.get('Item ID') and row.get('Name')
+        }
+        logging.info(f"Successfully created ITEM_ID_TO_NAME_MAP with {len(ITEM_ID_TO_NAME_MAP)} entries.")
 
     ALL_PERKS_DATA = perks.load_perks_from_csv(perks_csv_path) # Pass the path for consistency
     if not ALL_PERKS_DATA:
