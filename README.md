@@ -1,59 +1,62 @@
-# Ina's Discord Bot
+# Ina's New World Bot
 
-![Ina's Bot Logo](docs/src/images/logo.png)
+Your friendly Discord companion for all things Aeternum! Ina helps you look up items, perks, calculate crafting costs, manage builds, and much more.
 
-A playful, **New World MMO-themed** Discord bot for your server!
+## Features
 
-[![Invite Ina's Bot](https://img.shields.io/badge/Invite%20Ina's%20Bot-5865F2?style=for-the-badge&logo=discord&logoColor=white&labelColor=5865F2)](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
-[![GitHub Repo](https://img.shields.io/badge/GitHub-View%20Repo-181717?style=for-the-badge&logo=github)](https://github.com/involvex/ina-discord-bot-)
-[![Docs](https://img.shields.io/badge/Docs-Project%20Page-3a5a40?style=for-the-badge&logo=readthedocs)](https://involvex.github.io/ina-discord-bot-/)
-[![About New World](https://img.shields.io/badge/About%20New%20World-ffd700?style=for-the-badge&logo=amazon&logoColor=black)](https://www.newworld.com/)
+*   **Item & Perk Lookup:** Quickly find details about New World items and perks.
+*   **Crafting Assistance:** Calculate materials for crafts and view full recipe breakdowns.
+*   **Build Management:** Save and share your favorite `nw-buddy.de` builds.
+*   **Server Utilities:** Optional welcome messages for new members and server activity logging.
+*   **Fun Commands:** Includes `/petpet` and more!
+*   **Bot Management:** Tools for bot owners and administrators to manage the bot.
+*   **Automatic Updates:** Ina can check for and apply updates to herself (requires setup).
 
----
+## Commands
 
-## ✨ Features
+Here's a list of available commands. Use `/help [command_name]` in Discord for more details on a specific command.
 
-- **New World Database Lookup:** Instantly fetch item stats, recipes, and lore from Aeternum.
-- **Fun Status Rotation:** The bot cycles through witty New World-themed statuses.
-- **AI-powered Chat:** Ask questions, get tips, or lore with Gemini AI integration.
-- **Petpet Rituals:** Perform the legendary `/petpet` on your friends—summon magical GIFs!
-- **Random GIFs:** Bring laughter to your company with trending GIFs.
-- **Expedition Tools:** Handy calculators and utilities for your New World journey.
-- **Fully Customizable:** Open source, easy to extend, and ready for your guild.
-- **Constantly Evolving:** New commands and features are regularly added!
+### General Commands
+*   **/ping**: Check if the bot is online.
+*   **/help [command_name]**: Show available commands or help for a specific command.
+*   **/petpet &lt;user&gt;**: Give a New World petting ritual to a user!
+*   **/calculate &lt;expression&gt;**: Perform a calculation with New World magic!
+*   **/about**: Show information about Ina's New World Bot.
 
----
+### New World Specific Commands
+*   **/nwdb &lt;item_name&gt;**: Look up items from New World Database.
+*   **/perk &lt;perk_name&gt;**: Look up information about a specific New World perk.
+*   **/recipe &lt;item_name&gt;**: Show the full recipe breakdown for a craftable item.
+*   **/calculate_craft &lt;item_name&gt; [amount]**: Calculate resources needed to craft an item, including intermediates.
 
-## 🚀 Invite Ina's Bot to Your Server
+### Build Management
+*   **/build add &lt;link&gt; &lt;name&gt; [keyperks]**: Add a build from nw-buddy.de.
+*   **/build list**: Show a list of saved builds.
+*   **/build remove &lt;name&gt;**: Remove a saved build. (Requires: Manage Server or Bot Manager)
 
-[**Click here to invite Ina's Bot**](https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8)
+### Management & Settings (Require Permissions)
+*   **/manage update**: Pulls updates from GitHub and restarts the bot. (Requires: Bot Owner)
+*   **/manage restart**: Shuts down the bot for manual restart. (Requires: Bot Owner/Manager)
+*   **/settings permit &lt;user&gt;**: Grants a user bot management permissions. (Requires: Server Admin or Bot Owner)
+*   **/settings unpermit &lt;user&gt;**: Revokes a user's bot management permissions. (Requires: Server Admin or Bot Owner)
+*   **/settings listmanagers**: Lists users with bot management permissions. (Requires: Server Admin or Bot Manager/Owner)
+*   **/settings welcomemessages &lt;action&gt; [channel]**: Manage welcome messages. Actions: enable, disable, status. (Requires: Manage Server or Bot Manager/Owner)
+*   **/settings logging &lt;action&gt; [channel]**: Manage server activity logging. Actions: enable, disable, status. (Requires: Manage Server or Bot Manager/Owner)
 
----
+## Setup
 
-## 📚 Documentation
+1.  Clone the repository.
+2.  Install dependencies: `pip install -r requirements.txt`
+3.  Create a `.env` file in the root directory with your `BOT_TOKEN`. Example:
+    ```
+    BOT_TOKEN=YOUR_DISCORD_BOT_TOKEN_HERE
+    ```
+4.  Ensure `items.csv` and `perks.csv` are present in the root directory.
+5.  Run the bot: `python main.py`
 
-See the [GitHub Pages site](https://involvex.github.io/ina-discord-bot-/) for full documentation and usage instructions.
+For automatic updates, ensure `update_bot.ps1` (Windows) or `update_bot.sh` (Linux) is executable and correctly configured for your environment. The bot also needs a process manager (like PM2 or systemd) to restart it after an update.
 
----
+## Contributing
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
-## 🛠️ Quickstart
-
-```bash
-pip install -U discord-py-interactions
-```
-
-```python
-import interactions
-
-bot = interactions.Client()
-
-@interactions.listen()
-async def on_startup():
-    print("Bot is ready!")
-
-bot.start("token")
-```
-
----
-
-_Made with ❤️ for the New World community &copy; 2025_
+*(You can add more sections like License, Acknowledgements, etc.)*

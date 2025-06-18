@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.42" 
+__version__ = "0.2.43" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -180,51 +180,84 @@ async def ping(ctx):
 @slash_command("help", description="Show all available commands and their descriptions")
 @slash_option("command", "Get detailed help for a specific command", opt_type=OptionType.STRING, required=False)
 async def help_command(ctx, command: Optional[str] = None):
-    commands = {
-        "ping": "Check if the bot is online.",
-        "help": "Show all available commands and their descriptions.",
-        "petpet": "Give a New World petting ritual to a user!",
-        "calculate": "Perform a calculation with New World magic!",
-        "nwdb": "Look up items from New World Database.",
-        "calculate_craft": "Calculate all resources needed to craft an item, including intermediates.",
-        "recipe": "Show the full recipe breakdown for a craftable item and track it.",
-        "addbuild": "Add a build from nw-buddy.de with a name and optional key perks.",
-        "build list": "Show a list of saved builds.",
-        "build add": "Add a build from nw-buddy.de with a name and optional key perks.",
-        "build remove": "Remove a saved build (requires 'Manage Server' permission).",
-        "removebuild": "Remove a saved build (requires 'Manage Server' permission).",
-        "perk": "Look up information about a specific New World perk.",
-        "about": "Show information about Ina's New World Bot.",
-        "manage update": f"Triggers the bot's update script (Owner only: <@{OWNER_ID}>).",
-        "manage restart": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
-        "settings permit": "Grants a user bot management permissions (Server Administrator or Bot Owner only).",
-        "settings unpermit": "Revokes a user's bot management permissions (Server Administrator or Bot Owner only).", # Keep
-        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).", 
-        "settings welcomemessages": "Manage welcome messages. Actions: enable, disable, status. [channel] option required for 'enable'.",
-        "settings logging": "Manage server activity logging. Actions: enable, disable, status. [channel] option required for 'enable'."
+    # Using a more structured dictionary for command information
+    commands_info = {
+        "ping": {"desc": "Check if the bot is online.", "usage": "/ping"},
+        "help": {"desc": "Show available commands or help for a specific command.", "usage": "/help [command_name]"},
+        "petpet": {"desc": "Give a New World petting ritual to a user!", "usage": "/petpet <user>"},
+        "calculate": {"desc": "Perform a calculation with New World magic!", "usage": "/calculate <expression>"},
+        "nwdb": {"desc": "Look up items from New World Database.", "usage": "/nwdb <item_name>"},
+        "calculate_craft": {"desc": "Calculate resources needed to craft an item, including intermediates.", "usage": "/calculate_craft <item_name> [amount]"},
+        "recipe": {"desc": "Show the full recipe breakdown for a craftable item.", "usage": "/recipe <item_name>"},
+        "build add": {"desc": "Add a build from nw-buddy.de.", "usage": "/build add <link> <name> [keyperks]"},
+        "build list": {"desc": "Show a list of saved builds.", "usage": "/build list"},
+        "build remove": {"desc": "Remove a saved build.", "usage": "/build remove <name>", "perms": "Manage Server or Bot Manager"},
+        "perk": {"desc": "Look up information about a specific New World perk.", "usage": "/perk <perk_name>"},
+        "about": {"desc": "Show information about Ina's New World Bot.", "usage": "/about"},
+        "manage update": {"desc": "Pulls updates from GitHub and restarts the bot.", "usage": "/manage update", "perms": "Bot Owner"},
+        "manage restart": {"desc": "Shuts down the bot for manual restart.", "usage": "/manage restart", "perms": "Bot Owner/Manager"},
+        "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner"},
+        "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner"},
+        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner"},
+        "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Manage Server or Bot Manager/Owner"},
+        "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Manage Server or Bot Manager/Owner"}
     }
-    if command and command.lower() in commands:
-        await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
-    else:
-        header = "**Ina's New World Bot Commands:**\n"
-        full_help_text = header
-        current_page_lines = []
 
-        for cmd, desc in commands.items():
-            line = f"**/{cmd}**: {desc}"
-            # Check if adding the next line would exceed the limit (approximate)
-            # 2000 - current_page_length - new_line_length - buffer for markdown/etc.
-            if len(full_help_text) + len("\n".join(current_page_lines)) + len(line) + 50 > 1950: # 1950 to be safe
-                await ctx.send(full_help_text + "\n".join(current_page_lines))
-                current_page_lines = [line] # Start new page
-                full_help_text = "" # Reset header for subsequent pages if needed, or add (continued)
+    if command:
+        command_name_lookup = command.lower().strip()
+        info_to_display = commands_info.get(command_name_lookup)
+
+        if info_to_display:
+            usage = info_to_display['usage']
+            desc = info_to_display['desc']
+            perms = f"\nPermissions: {info_to_display['perms']}" if 'perms' in info_to_display else ""
+            await ctx.send(f"**{usage}**\n{desc}{perms}")
+        else:
+            # Try to find commands that start with the input, for base commands like /build
+            matching_commands_details = []
+            for cmd_key, cmd_info in commands_info.items():
+                if cmd_key.startswith(command_name_lookup):
+                    usage = cmd_info['usage']
+                    desc = cmd_info['desc']
+                    perms_note = f" ({cmd_info['perms']})" if 'perms' in cmd_info else ""
+                    matching_commands_details.append(f"**{usage}**: {desc}{perms_note}")
+            
+            if matching_commands_details:
+                response = f"Help for commands starting with '{command_name_lookup}':\n\n" + "\n\n".join(matching_commands_details)
+                # Discord message limit is 2000 characters
+                if len(response) > 1950: # Leave some buffer
+                    response = response[:1900] + "\n... (too many matches to display fully)"
+                await ctx.send(response)
             else:
-                current_page_lines.append(line)
-        
-        # Send any remaining lines
-        if current_page_lines:
-            await ctx.send(full_help_text + "\n".join(current_page_lines))
+                await ctx.send(f"Command '{command}' not found. Use `/help` to see all commands.")
+    else:
+        page_contents = []
+        current_page_text = "**Ina's New World Bot Commands:**\n\n"
 
+        for cmd_key, info in commands_info.items():
+            usage = info['usage']
+            desc = info['desc']
+            perms_note = f" ({info['perms']})" if 'perms' in info else ""
+            line = f"**{usage}**: {desc}{perms_note}\n\n" # Add double newline for better spacing
+
+            if len(current_page_text) + len(line) > 1950: # Discord message limit is 2000, keep some buffer
+                page_contents.append(current_page_text.strip())
+                current_page_text = line # Start new page with the current line
+            else:
+                current_page_text += line
+        
+        if current_page_text.strip(): # Add the last page if it has content
+            page_contents.append(current_page_text.strip())
+
+        if not page_contents or (len(page_contents) == 1 and page_contents[0] == "**Ina's New World Bot Commands:**"):
+            await ctx.send("No commands to display.", ephemeral=True)
+            return
+
+        for i, page_text_content in enumerate(page_contents):
+            if i == 0:
+                await ctx.send(page_text_content)
+            else:
+                await ctx.followup.send(page_text_content) # Use followup for subsequent messages
 
 
 @slash_command("petpet", description="Give a New World petting ritual to a user!")
