@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.22" 
+__version__ = "0.2.24" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -378,7 +378,7 @@ async def recipe(ctx, item_name: str):
     await ctx.send(embeds=embed)
 
 
-@recipe.autocomplete(name="item_name")
+@recipe.autocomplete("item_name")
 async def recipe_autocomplete(ctx):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     # Load all items from CSV for autocomplete
@@ -508,7 +508,7 @@ async def build_remove(ctx: SlashContext, name: str):
         logging.error(f"Error writing builds file after removing build: {e}")
         await ctx.send("An error occurred while trying to remove the build.", ephemeral=True)
 
-@build_remove.autocomplete(name="name")
+@build_remove.autocomplete("name")
 async def build_remove_autocomplete(ctx: SlashContext):
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
@@ -617,7 +617,7 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
 
     return re.sub(r'\$\{(.*?)\}', replace_match, base_value)
 
-@perk_command.autocomplete(name="perk_name")
+@perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx):
     all_perks_data = perks.load_perks_from_csv()
     if not all_perks_data:
