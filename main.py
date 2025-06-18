@@ -27,7 +27,7 @@ import datetime # For timestamps in logs
 
 load_dotenv()
 
-__version__ = "0.2.29" 
+__version__ = "0.2.32" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -194,13 +194,9 @@ async def help_command(ctx, command: Optional[str] = None):
         "manage restart": "Requests the bot to shut down for a manual restart (Bot Owner/Manager only).",
         "settings permit": "Grants a user bot management permissions (Server Administrator or Bot Owner only).",
         "settings unpermit": "Revokes a user's bot management permissions (Server Administrator or Bot Owner only).", # Keep
-        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).", # Keep
-        "settings welcomemessages enable_welcome": "Enables welcome messages in a specific channel (Server Admin or Bot Manager/Owner).",
-        "settings welcomemessages disable_welcome": "Disables welcome messages for this server (Server Admin or Bot Manager/Owner).",
-        "settings welcomemessages welcome_status": "Shows the current welcome message configuration (Server Admin or Bot Manager/Owner).",
-        "settings logging enable_logging": "Enables server activity logging in a specific channel (Server Admin or Bot Manager/Owner).",
-        "settings logging disable_logging": "Disables server activity logging for this server (Server Admin or Bot Manager/Owner).",
-        "settings logging logging_status": "Shows the current server activity logging configuration (Server Admin or Bot Manager/Owner)."
+        "settings listmanagers": "Lists users with bot management permissions (Server Administrator or Bot Owner only).", 
+        "settings welcomemessages": "Manage welcome messages. Actions: enable, disable, status. [channel] option required for 'enable'.",
+        "settings logging": "Manage server activity logging. Actions: enable, disable, status. [channel] option required for 'enable'."
     }
     if command and command.lower() in commands:
         await ctx.send(f"**/{command.lower().split()[0]}**: {commands[command.lower()]}") # Use split for commands with options in help
@@ -913,85 +909,30 @@ async def settings_listmanagers_subcommand(ctx: SlashContext): # Renamed
     await ctx.send(embeds=embed, ephemeral=True)
 
 
-# Define the subcommand group 'welcomemessages' under 'settings'
-@settings.subcommand(sub_cmd_name="welcomemessages", sub_cmd_description="Manage welcome messages for new members.")
-async def settings_welcomemessages_group(ctx: SlashContext): # Renamed function to indicate it's the group base
-    """Base for welcome message settings."""
-    pass
-
-@settings_welcomemessages_group.subcommand(
-    sub_cmd_name="enable_welcome",
-    sub_cmd_description="Enables welcome messages in a specific channel."
+# Refactored welcome messages settings command
+@settings.subcommand(
+    sub_cmd_name="welcomemessages", 
+    sub_cmd_description="Manage welcome messages for new members (enable/disable/status)."
+)
+@slash_option(
+    name="action",
+    description="The action to perform for welcome messages.",
+    opt_type=OptionType.STRING,
+    required=True,
+    choices=[
+        {"name": "Enable Welcome Messages", "value": "enable"},
+        {"name": "Disable Welcome Messages", "value": "disable"},
+        {"name": "Show Welcome Message Status", "value": "status"},
+    ]
 )
 @slash_option(
     "channel",
-    "The text channel where welcome messages should be sent.",
+    "The text channel for welcome messages (required if action is 'enable').",
     opt_type=OptionType.CHANNEL,
-    required=True,
-    channel_types=[ChannelType.GUILD_TEXT] # Restrict to text channels
-)
-async def settings_welcomemessages_enable(ctx: SlashContext, channel: GuildText):
-    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
-        return
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.", ephemeral=True)
-        return
-
-    save_welcome_setting(str(ctx.guild.id), True, str(channel.id))
-    await ctx.send(f"✅ Welcome messages are now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
-
-@settings_welcomemessages_group.subcommand(
-    sub_cmd_name="disable_welcome",
-    sub_cmd_description="Disables welcome messages for this server."
-)
-async def settings_welcomemessages_disable(ctx: SlashContext):
-    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
-        return
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.", ephemeral=True)
-        return
-
-    save_welcome_setting(str(ctx.guild.id), False, None)
-    await ctx.send("✅ Welcome messages are now **disabled** for this server.", ephemeral=True)
-
-@settings_welcomemessages_group.subcommand(
-    sub_cmd_name="welcome_status",
-    sub_cmd_description="Shows the current welcome message configuration."
-)
-async def settings_welcomemessages_status(ctx: SlashContext):
-    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
-        return
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.", ephemeral=True)
-        return
-
-    setting = get_welcome_setting(str(ctx.guild.id))
-    if setting and setting.get("enabled") and setting.get("channel_id"):
-        await ctx.send(f"ℹ️ Welcome messages are **enabled** and set to channel <#{setting['channel_id']}>.", ephemeral=True)
-    else:
-        await ctx.send("ℹ️ Welcome messages are currently **disabled** for this server.", ephemeral=True)
-
-# Define the subcommand group 'logging' under 'settings'
-@settings.subcommand(sub_cmd_name="logging", sub_cmd_description="Manage server activity logging.")
-async def settings_logging_group(ctx: SlashContext): # Renamed function to indicate it's the group base
-    """Base for server activity logging settings."""
-    pass
-
-@settings_logging_group.subcommand(
-    sub_cmd_name="enable_logging",
-    sub_cmd_description="Enables server activity logging in a specific channel."
-)
-@slash_option(
-    "channel",
-    "The text channel where activity logs should be sent.",
-    opt_type=OptionType.CHANNEL,
-    required=True,
+    required=False, # Optional at API level, checked in code
     channel_types=[ChannelType.GUILD_TEXT]
 )
-async def settings_logging_enable(ctx: SlashContext, channel: GuildText): # Type hint as GuildText
+async def settings_welcomemessages_manager(ctx: SlashContext, action: str, channel: Optional[GuildText] = None):
     if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
         await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
         return
@@ -999,45 +940,86 @@ async def settings_logging_enable(ctx: SlashContext, channel: GuildText): # Type
         await ctx.send("This command can only be used in a server.", ephemeral=True)
         return
 
-    save_logging_setting(str(ctx.guild.id), True, str(channel.id))
-    await ctx.send(f"✅ Server activity logging is now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
+    action = action.lower() # Normalize action string
 
-@settings_logging_group.subcommand(
-    sub_cmd_name="disable_logging",
-    sub_cmd_description="Disables server activity logging for this server."
-)
-async def settings_logging_disable(ctx: SlashContext):
-    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
-        return
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.", ephemeral=True)
-        return
-
-    save_logging_setting(str(ctx.guild.id), False, None)
-    await ctx.send("✅ Server activity logging is now **disabled** for this server.", ephemeral=True)
-
-@settings_logging_group.subcommand(
-    sub_cmd_name="logging_status",
-    sub_cmd_description="Shows the current server activity logging configuration."
-)
-async def settings_logging_status(ctx: SlashContext):
-    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
-        return
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.", ephemeral=True)
-        return
-
-    setting = get_logging_setting(str(ctx.guild.id))
-    if setting and setting.get("enabled") and setting.get("channel_id"):
-        try:
-            log_channel = await bot.fetch_channel(int(setting['channel_id']))
-            await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel {log_channel.mention}.", ephemeral=True)
-        except Exception:
-            await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel ID `{setting['channel_id']}` (channel might be deleted or inaccessible).", ephemeral=True)
+    if action == "enable":
+        if not channel:
+            await ctx.send("A channel is required to enable welcome messages. Please specify a channel.", ephemeral=True)
+            return
+        save_welcome_setting(str(ctx.guild.id), True, str(channel.id))
+        await ctx.send(f"✅ Welcome messages are now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
+    elif action == "disable":
+        save_welcome_setting(str(ctx.guild.id), False, None)
+        await ctx.send("✅ Welcome messages are now **disabled** for this server.", ephemeral=True)
+    elif action == "status":
+        setting = get_welcome_setting(str(ctx.guild.id))
+        if setting and setting.get("enabled") and setting.get("channel_id"):
+            try:
+                welcome_channel_obj = await bot.fetch_channel(int(setting['channel_id']))
+                await ctx.send(f"ℹ️ Welcome messages are **enabled** and set to channel {welcome_channel_obj.mention}.", ephemeral=True)
+            except Exception:
+                await ctx.send(f"ℹ️ Welcome messages are **enabled** and set to channel ID `{setting['channel_id']}` (channel might be deleted or inaccessible).", ephemeral=True)
+        else:
+            await ctx.send("ℹ️ Welcome messages are currently **disabled** for this server.", ephemeral=True)
     else:
-        await ctx.send("ℹ️ Server activity logging is currently **disabled** for this server.", ephemeral=True)
+        # This case should ideally not be reached if choices are enforced by Discord
+        await ctx.send("Invalid action specified. Please use 'enable', 'disable', or 'status'.", ephemeral=True)
+
+# Refactored logging settings command
+@settings.subcommand(
+    sub_cmd_name="logging", 
+    sub_cmd_description="Manage server activity logging (enable/disable/status)."
+)
+@slash_option(
+    name="action",
+    description="The action to perform for server activity logging.",
+    opt_type=OptionType.STRING,
+    required=True,
+    choices=[
+        {"name": "Enable Logging", "value": "enable"},
+        {"name": "Disable Logging", "value": "disable"},
+        {"name": "Show Logging Status", "value": "status"},
+    ]
+)
+@slash_option(
+    "channel",
+    "The text channel for logs (required if action is 'enable').",
+    opt_type=OptionType.CHANNEL,
+    required=False, # Optional at API level, checked in code
+    channel_types=[ChannelType.GUILD_TEXT]
+)
+async def settings_logging_manager(ctx: SlashContext, action: str, channel: Optional[GuildText] = None):
+    if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
+        await ctx.send("You need 'Manage Server' permission or be a Bot Manager/Owner to use this command.", ephemeral=True)
+        return
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.", ephemeral=True)
+        return
+    
+    action = action.lower() # Normalize action string
+
+    if action == "enable":
+        if not channel:
+            await ctx.send("A channel is required to enable logging. Please specify a channel.", ephemeral=True)
+            return
+        save_logging_setting(str(ctx.guild.id), True, str(channel.id))
+        await ctx.send(f"✅ Server activity logging is now **enabled** and will be sent to {channel.mention}.", ephemeral=True)
+    elif action == "disable":
+        save_logging_setting(str(ctx.guild.id), False, None)
+        await ctx.send("✅ Server activity logging is now **disabled** for this server.", ephemeral=True)
+    elif action == "status":
+        setting = get_logging_setting(str(ctx.guild.id))
+        if setting and setting.get("enabled") and setting.get("channel_id"):
+            try:
+                log_channel_obj = await bot.fetch_channel(int(setting['channel_id']))
+                await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel {log_channel_obj.mention}.", ephemeral=True)
+            except Exception:
+                await ctx.send(f"ℹ️ Server activity logging is **enabled** and set to channel ID `{setting['channel_id']}` (channel might be deleted or inaccessible).", ephemeral=True)
+        else:
+            await ctx.send("ℹ️ Server activity logging is currently **disabled** for this server.", ephemeral=True)
+    else:
+        # This case should ideally not be reached if choices are enforced by Discord
+        await ctx.send("Invalid action specified. Please use 'enable', 'disable', or 'status'.", ephemeral=True)
 
 SILLY_MENTION_RESPONSES = [
     "Did someone say my name? Or was it just the wind in Aeternum?",
