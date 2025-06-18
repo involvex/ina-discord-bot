@@ -20,3 +20,6 @@ __pycache__
 /.coverage
 .mypy_cache/
 items.json
+items.csv
+perks.csv
+perks_scraped.csv
