@@ -16,122 +16,91 @@ echo "Ina's New World Bot Updater (Linux)"
 echo "==================================="
 echo ""
 
-# --- Configuration ---
-# Determine the directory of this script, which is assumed to be the Git repo root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-BotDirectory="$SCRIPT_DIR"
+# --- Configuration (from the original script's intent) ---
+SCRIPT_DIR_CONF="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)" # Renamed to avoid conflict
+BotDirectory="$SCRIPT_DIR_CONF" # BotDirectory is essentially SCRIPT_DIR
 GitBranch="main"
 
-
 # Get the directory of the script
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR_ACTUAL="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # This is the effective script directory
 
 # Navigate to the script's directory (root of your Git repo)
-cd "$SCRIPT_DIR" || exit 1
+cd "$SCRIPT_DIR_ACTUAL" || { echo "ERROR: Failed to navigate to script directory $SCRIPT_DIR_ACTUAL. Update aborted." >&2; exit 1; }
+echo "INFO: Operating in bot repository directory: $(pwd)"
+echo ""
 
-echo "Starting forceful update..."
+# Check for and remove .git/index.lock file if it exists
+LOCK_FILE=".git/index.lock"
+if [ -f "$LOCK_FILE" ]; then
+    echo "INFO: Git index.lock file found at '$PWD/$LOCK_FILE'. Attempting to remove it..."
+    rm -f "$LOCK_FILE"
+    if [ $? -eq 0 ]; then # Check rm exit status
+        if [ ! -f "$LOCK_FILE" ]; then # Double check file is gone
+            echo "INFO: index.lock removed successfully."
+        else
+            # This case means rm reported success but file is still there - very odd, maybe recreated instantly
+            echo "WARNING: rm command succeeded but index.lock still exists. Git operations might still fail." >&2
+        fi
+    else
+        # rm command itself failed
+        echo "ERROR: Failed to remove index.lock (rm command failed with exit code $?). Check permissions for '$PWD/$LOCK_FILE'. Update aborted." >&2
+        exit 1 # Exit if lock removal fails, as subsequent git commands will likely fail
+    fi
+else
+    echo "INFO: No .git/index.lock file found. Proceeding with update."
+fi
+echo ""
 
+echo "INFO: Starting forceful update from origin/$GitBranch..."
+
+echo "INFO: Fetching all remote branches and tags (shallow fetch)..."
 # Fetch all remote branches and tags
-git fetch --all
+# Using --depth 1 to reduce memory usage, which can help prevent "signal 9" errors.
+git fetch --all --depth 1
 if [ $? -ne 0 ]; then
-  echo "Error: git fetch failed."
+  echo "ERROR: git fetch --all --depth 1 failed. Update aborted." >&2
   exit 1
 fi
+echo "INFO: Fetch successful."
 
 # Hard reset the local main branch to match the remote origin/main
 # Replace 'main' with your default branch name if it's different (e.g., master)
-git reset --hard origin/main
+echo "INFO: Resetting local branch to origin/$GitBranch..."
+git reset --hard "origin/$GitBranch" # Use variable and quote
 if [ $? -ne 0 ]; then
-  echo "Error: git reset --hard origin/main failed."
+  echo "ERROR: git reset --hard origin/$GitBranch failed. Update aborted." >&2
   exit 1
 fi
+echo "INFO: Reset to origin/$GitBranch successful."
 
 # Remove untracked files and directories, including those in .gitignore
 # Use with caution: -x also removes ignored files. If you don't want that, remove the 'x'.
+echo "INFO: Cleaning untracked files and directories..."
 git clean -fd # Changed -fdx to -fd to preserve ignored files like .env
 if [ $? -ne 0 ]; then
-  echo "Error: git clean -fd failed."
+  echo "ERROR: git clean -fd failed. Update aborted." >&2
   exit 1
 fi
+echo "INFO: Clean successful."
 
-echo "Local repository forcefully updated to origin/main and cleaned."
+echo "INFO: Local repository forcefully updated to origin/$GitBranch and cleaned."
 
 # Optional: Reinstall dependencies if requirements.txt might have changed
 # Make sure pip is available or use the full path to your virtual environment's pip
 if [ -f "requirements.txt" ]; then
-  echo "Reinstalling dependencies from requirements.txt..."
-  # Adjust pip command as needed (e.g., pip3, or path to venv pip)
-  pip install -U -r requirements.txt
+  echo "INFO: Reinstalling dependencies from requirements.txt..."
+  # Consider using 'python3 -m pip' for clarity if multiple pythons/pips exist
+  python3 -m pip install -U -r requirements.txt
   if [ $? -ne 0 ]; then
     echo "Warning: pip install -r requirements.txt failed. Dependencies might be outdated."
-    # Decide if this should be a fatal error (exit 1) or just a warning
+  else
+    echo "INFO: Dependencies reinstalled successfully."
   fi
 fi
 
-echo "Update script completed. Bot will be restarted by the main Python script."
+echo ""
+echo "==================================="
+echo "Update Script Completed"
+echo "==================================="
+echo "Bot will be restarted by the main Python script if update was successful."
 exit 0
-
-# --- Check for Git ---
-if ! command -v git &> /dev/null
-then
-    echo "Error: Git is not installed or not found in PATH. Please install Git." >&2
-    exit 1
-fi
-echo "Git installation found."
-echo ""
-
-# --- Navigate to Bot Directory (which is the script's directory) ---
-echo "Ensuring execution in bot repository directory: $BotDirectory"
-cd "$BotDirectory" || { echo "Error: Failed to navigate to bot repository directory: $BotDirectory. This script must be run from within the git repository." >&2; exit 1; }
-echo "Successfully operating in bot repository directory: $(pwd)"
-echo ""
-
-# --- Fetch latest changes from all remotes ---
-echo "Fetching latest updates from remote repository..."
-git fetch --all --progress -f
-if [ $? -ne 0 ]; then
-    echo "Error: Git fetch failed. Check your internet connection and Git configuration." >&2
-    exit 1
-fi
-echo "Fetch successful."
-echo ""
-
-# --- Ensure we are on the correct branch ---
-echo "Ensuring you are on the '$GitBranch' branch..."
-currentBranch=$(git rev-parse --abbrev-ref HEAD)
-if [ "$currentBranch" != "$GitBranch" ]; then
-    echo "Currently on branch '$currentBranch'. Attempting to checkout '$GitBranch'..."
-    git checkout "$GitBranch"
-    if [ $? -ne 0 ]; then
-        echo "Error: Failed to checkout branch '$GitBranch'. Update cannot proceed safely." >&2
-        exit 1
-    fi
-fi
-echo "Successfully on branch '$GitBranch'."
-echo ""
-
-# --- Pull changes from the main branch of origin ---
-echo "Pulling changes from origin/$GitBranch..."
-
-echo "Attempting to discard any local changes before pull..."
-git reset --hard HEAD
-if [ $? -ne 0 ]; then
-    echo "Warning: 'git reset --hard HEAD' failed. Local changes might still exist and cause pull issues." >&2
-    # Optionally, you could exit here if a clean state is mandatory
-    # exit 1
-fi
-git pull origin "$GitBranch" --progress
-if [ $? -ne 0 ]; then
-    echo "Error: Git pull failed. You might have local changes that conflict. Please resolve conflicts manually or stash your changes (e.g., 'git stash') and try again." >&2
-    exit 1
-fi
-echo "Successfully pulled latest changes."
-echo ""
-
-echo "==================================="
-echo "Update Complete!"
-echo "==================================="
-echo ""
-echo "Please restart Ina's New World Bot for the changes to take effect."
-echo "If 'main.py', dependency files, or other critical code files were updated, a restart is necessary."
-echo ""
