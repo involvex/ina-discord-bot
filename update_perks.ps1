@@ -10,9 +10,21 @@ Set-Location -To "$(Split-Path -Path $MyInvocation.MyCommand.Path -Parent)"
 # . .\venv\Scripts\Activate.ps1
 
 # Run the Python script
-python scrape_perks.py
+python3 scrape_perks.py # Using python3 explicitly
+
+# Check for and remove .git/index.lock file if it exists
+$LockFile = ".git/index.lock"
+if (Test-Path $LockFile) {
+    Write-Host "Git index.lock file found. Attempting to remove it..."
+    Remove-Item $LockFile -ErrorAction SilentlyContinue
+    if (-not (Test-Path $LockFile)) {
+        Write-Host "index.lock removed successfully."
+    } else {
+        Write-Warning "Failed to remove index.lock. Git operations might still fail."
+    }
+}
 
 # Commit and push changes (ensure git is initialized in your project and you have proper permissions)
 git add perks_scraped.csv
-git commit -m "Update perks data"
+git commit -m "Update perks data (automated)"
 git push
