@@ -1,12 +1,15 @@
 import math
 from typing import Optional
-from interactions import slash_command, slash_option, OptionType, Embed
+import logging # Added for logging
+from interactions import slash_command, slash_option, OptionType, Embed, File
 from bot_client import bot
 from config import __version__, OWNER_ID
+from utils.image_utils import generate_petpet_gif # Import the new function
 
 @slash_command("ping", description="Check if the bot is online.")
 async def ping(ctx):
-    await ctx.send("Pong! Ina is online.")
+    latency_ms = round(bot.latency * 1000)
+    await ctx.send(f"Pong! Ina is online. Latency: {latency_ms}ms")
 
 @slash_command("help", description="Show all available commands and their descriptions")
 @slash_option("command", "Get detailed help for a specific command", opt_type=OptionType.STRING, required=False)
@@ -41,7 +44,21 @@ async def help_command(ctx, command: Optional[str] = None):
 @slash_command("petpet", description="Give a New World petting ritual to a user!")
 @slash_option("user", "The user to pet (Aeternum style)", opt_type=OptionType.USER, required=True)
 async def petpet(ctx, user):
-    await ctx.send(f"✨ {user.mention} receives a magical petpet ritual from the winds of Aeternum! 🐾")
+    await ctx.defer() # Defer response as GIF generation can take a moment
+
+    avatar_url = user.avatar_url # Get the target user's avatar URL
+    if not avatar_url:
+        # Fallback if avatar_url is None (e.g., for users with default avatars, though usually it provides a default URL)
+        # Or handle this case by sending a message that avatar couldn't be fetched.
+        # For simplicity, let's try to use the display_avatar if avatar_url is None
+        avatar_url = user.display_avatar.url # display_avatar should always provide a URL
+
+    gif_buffer = await generate_petpet_gif(str(avatar_url)) # Ensure URL is string
+
+    if gif_buffer:
+        await ctx.send(files=[File(fp=gif_buffer, filename="petpet.gif")])
+    else:
+        await ctx.send("Sorry, I couldn't create the petpet animation right now. Maybe the winds of Aeternum are too wild!", ephemeral=True)
 
 @slash_command("calculate", description="Perform a calculation with New World magic!")
 @slash_option("expression", "The mathematical expression to calculate", opt_type=OptionType.STRING, required=True)
