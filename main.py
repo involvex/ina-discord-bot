@@ -398,6 +398,20 @@ async def perk_command(ctx, perk_name: str):
     embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
     await ctx.send(embeds=embed)
 
+
+def scale_value_with_gs(base_value: str, gear_score: int = 725) -> str:
+    """Scale values with gear score based on assumption that base values are for a lower GS"""
+    # Check if base value is something we can scale.
+    if not base_value or '${' not in base_value:
+        return base_value
+    # Assume scaling is linear with GS.
+    # This might not be 100% accurate but a decent approximation
+    # Most values seem to scale from base GS 500.
+    base_gs = 500
+    multiplier = gear_score / base_gs
+    scaled_value = base_value.replace('perkMultiplier', str(multiplier))
+    return scaled_value
+
 @perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx):
     all_perks_data = perks.load_perks_from_csv()
@@ -413,7 +427,7 @@ async def perk_autocomplete(ctx):
     for perk_key_lower, perk_data_dict in all_perks_data.items():
         if search_term in perk_key_lower:
             # Try to get the original cased name for display
-            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title()))
+            display_name = perk_data_dict.get('name', perk_data_dict.get('Name', perk_key_lower.title())) # Original casing for display
             matches.append({"name": display_name, "value": display_name}) # Send original cased name as value too
 
     # Ensure unique choices by name (in case of slight variations leading to same display name)
