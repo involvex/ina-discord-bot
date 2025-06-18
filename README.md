@@ -20,6 +20,7 @@ A playful, **New World MMO-themed** Discord bot for your server!
 - **Random GIFs:** Bring laughter to your company with trending GIFs.
 - **Expedition Tools:** Handy calculators and utilities for your New World journey.
 - **Fully Customizable:** Open source, easy to extend, and ready for your guild.
+- **Constantly Evolving:** New commands and features are regularly added!
 
 ---
 

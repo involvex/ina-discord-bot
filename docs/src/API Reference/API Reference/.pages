@@ -8,4 +8,6 @@ nav:
     - models
     - ext
     - utils.md
+    - BotCommands.md  # Documentation for bot specific commands
+    - Changelog.md    # To track new changes and updates
     - monopage.md
