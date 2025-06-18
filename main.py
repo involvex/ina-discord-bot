@@ -15,7 +15,7 @@ from interactions import Client, slash_command, slash_option, OptionType, Permis
 from interactions.models.discord.channel import GuildText # For specific channel type checking
 from typing import Optional
 import packaging.version  # For version comparison
-from recipes import get_recipe, calculate_crafting_materials, RECIPES, track_recipe
+from recipes import get_recipe, calculate_crafting_materials, track_recipe
 from utils.image_utils import generate_petpet_gif
 import json
 from bs4 import BeautifulSoup
@@ -101,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.59" 
+__version__ = "0.2.60" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
