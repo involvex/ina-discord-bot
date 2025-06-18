@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.101" 
+__version__ = "0.2.102" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -1004,7 +1004,7 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
         expression_inside_braces = match.group(1) # Content within ${...}
         return _eval_perk_expression(expression_inside_braces, gs_multiplier)
 
-    return re.sub(r'\$\{(.*?)\}', replace_match, base_value)
+    return re.sub(r'\{\[(.*?)\]\}', replace_match, base_value)
 
 @perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx: SlashContext): # Added type hint
