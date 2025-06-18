@@ -28,14 +28,12 @@ DB_NAME = "new_world_data.db" # Path to your SQLite DB
 
 def get_db_connection():
     # Check if DB exists, if not, try to create it by calling populate_db()
-    # This is a simplified check; you might want more robust logic
+    # The primary check and creation attempt is now in load_all_game_data()
     if not os.path.exists(DB_NAME):
-        logging.critical(f"CRITICAL: Database '{DB_NAME}' not found. The bot cannot function without it. Please run 'create_db.py' to generate the database.")
-        # You could attempt to run the population logic here if appropriate
-        # from create_db import populate_db
-        # populate_db() # This might be too slow/memory intensive for startup
-        # For now, we'll let it try to connect and fail if DB doesn't exist,
-        # or commands will handle the non-existence.
+        # This log indicates that despite startup checks, the DB is still missing when a command needs it.
+        logging.error(f"get_db_connection: Database '{DB_NAME}' not found when attempting to connect. Data-dependent features will fail.")
+        # SQLite will attempt to create an empty DB file if it doesn't exist and has permissions,
+        # but our tables wouldn't be there. Commands need to handle this.
 
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row # To access columns by name
@@ -103,7 +101,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.51" 
+__version__ = "0.2.52" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -1623,24 +1621,47 @@ async def check_for_updates():
 
 def load_all_game_data():
     """
-    Ensures the SQLite database file exists.
+    Ensures the SQLite database file exists. If not, attempts to create and populate it.
     The actual data loading into the DB is handled by create_db.py.
     """
-    # global ITEM_DATA, ALL_PERKS_DATA, ITEM_ID_TO_NAME_MAP # These are no longer used
     logging.info("Verifying game data source (SQLite Database)...")
 
     if not os.path.exists(DB_NAME):
+        logging.warning(
+            f"Database file '{DB_NAME}' not found. Attempting to create and populate it now. "
+            f"This may take some time and consume resources..."
+        )
+        try:
+            from create_db import populate_db # Import here to avoid potential circular import issues at module load time
+            populate_db() # This function from create_db.py prints its own progress
+            if os.path.exists(DB_NAME):
+                logging.info(f"Database '{DB_NAME}' created and populated successfully.")
+            else:
+                # This case means populate_db ran but didn't create the file, which indicates an issue in populate_db
+                logging.error(
+                    f"CRITICAL: populate_db() completed but database file '{DB_NAME}' still not found. "
+                    f"Bot may not function correctly for data-dependent commands."
+                )
+        except ImportError:
+            logging.error(
+                "CRITICAL: Could not import 'populate_db' from 'create_db.py'. "
+                "Database cannot be automatically created. Please run 'create_db.py' manually if possible."
+            )
+        except Exception as e:
+            logging.error(
+                f"CRITICAL: An error occurred while trying to automatically create/populate the database '{DB_NAME}': {e}. "
+                f"Please run 'create_db.py' manually if possible. Bot may not function correctly.", exc_info=True
+            )
+    
+    if os.path.exists(DB_NAME):
+        logging.info(f"Database '{DB_NAME}' is available. Bot will use it for data lookups.")
+    else:
         logging.critical(
             f"CRITICAL: Database file '{DB_NAME}' not found. "
             f"The bot relies on this database for item, perk, and recipe data. "
-            f"Please run 'python create_db.py' to generate or update the database before starting the bot."
+            f"Automatic creation failed or was not possible. Please ensure 'create_db.py' can run successfully or create the DB manually."
         )
-        # Consider exiting if the DB is essential for core functionality:
-        # sys.exit(f"Database {DB_NAME} not found. Bot cannot start.")
-    else:
-        logging.info(f"Database '{DB_NAME}' found. Bot will use it for data lookups.")
-
-    logging.info("Game data loading process complete.")
+    logging.info("Game data verification/creation process complete.")
 
 @bot.event()
 async def on_ready():
