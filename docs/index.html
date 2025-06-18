@@ -1,207 +1,231 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Ina's Discord Bot - New World Companion</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="src/images/favicon.png">
-  <!-- Enhanced Styles -->
-  <style>
-body {
-    background: linear-gradient(135deg, #181c1f 0%, #232a34 100%);
-    min-height: 100vh;
-    color: #f5e6c8;
-    font-family: 'Cinzel', 'Merriweather', serif;
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-}
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Merriweather:wght@400;700&display=swap');
-
-.hero {
-    text-align: center;
-    padding: 3rem 1rem 2rem 1rem;
-    background: radial-gradient(circle at 50% 0%, #2d2d2d 0%, #181c1f 100%);
-    box-shadow: 0 0 60px 10px #bfa04644;
-    position: relative;
-}
-.logo-glow {
-    width: 120px;
-    filter: drop-shadow(0 0 30px #bfa046cc) drop-shadow(0 0 10px #fff8e1cc);
-    margin-bottom: 1rem;
-    animation: glow 2.5s infinite alternate;
-}
-@keyframes glow {
-    0% { filter: drop-shadow(0 0 20px #bfa04688) drop-shadow(0 0 5px #fff8e1aa); }
-    100% { filter: drop-shadow(0 0 40px #bfa046ff) drop-shadow(0 0 20px #fff8e1ff); }
-}
-.title {
-    font-family: 'Cinzel', serif;
-    font-size: 3rem;
-    color: #ffe082;
-    letter-spacing: 2px;
-    margin: 0.5rem 0 0.2rem 0;
-    text-shadow: 0 0 10px #bfa046, 0 0 2px #fff8e1;
-}
-.subtitle {
-    font-size: 1.3rem;
-    color: #bfa046;
-    margin-bottom: 1.5rem;
-    text-shadow: 0 0 8px #bfa04688;
-}
-.cta-btn {
-    display: block;
-    background: linear-gradient(90deg, #bfa046 0%, #ffe082 100%);
-    color: #232a34;
-    font-weight: bold;
-    font-size: 1.1rem;
-    padding: 0.8rem 2.2rem;
-    border-radius: 30px;
-    box-shadow: 0 0 20px #bfa04688;
-    text-decoration: none;
-    margin-top: 1rem;
-    transition: background 0.3s, color 0.3s, box-shadow 0.3s;
-    border: 2px solid #bfa046;
-    margin-left: auto;
-    margin-right: auto;
-}
-.cta-btn:hover {
-    background: #232a34;
-    color: #ffe082;
-    box-shadow: 0 0 30px #bfa046cc;
-    border: 2px solid #ffe082;
-}
-.features {
-    max-width: 900px;
-    margin: 3rem auto 2rem auto;
-    padding: 2rem 1rem;
-    background: rgba(34, 28, 18, 0.7);
-    border-radius: 18px;
-    box-shadow: 0 0 40px #bfa04633;
-}
-.features h2 {
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    color: #ffe082;
-    margin-bottom: 2rem;
-    font-size: 2.2rem;
-    text-shadow: 0 0 8px #bfa04688;
-}
-.feature-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2rem;
-    justify-content: center;
-}
-.feature-card {
-    background: linear-gradient(120deg, #232a34 60%, #181c1f 100%);
-    border: 1.5px solid #bfa04688;
-    border-radius: 14px;
-    box-shadow: 0 0 18px #bfa04622;
-    padding: 1.5rem 1.2rem;
-    width: 220px;
-    text-align: center;
-    transition: transform 0.2s, box-shadow 0.2s;
-    position: relative;
-}
-.feature-card:hover {
-    transform: translateY(-8px) scale(1.04);
-    box-shadow: 0 0 32px #bfa046cc;
-    border-color: #ffe082;
-}
-.feature-icon {
-    font-size: 2.2rem;
-    margin-bottom: 0.7rem;
-    display: block;
-    text-shadow: 0 0 10px #bfa04688;
-}
-.feature-card h3 {
-    color: #ffe082;
-    font-family: 'Cinzel', serif;
-    margin: 0.5rem 0 0.3rem 0;
-    font-size: 1.2rem;
-}
-.feature-card p {
-    color: #f5e6c8;
-    font-size: 1rem;
-    margin: 0;
-}
-.footer {
-    text-align: center;
-    padding: 1.5rem 0 1rem 0;
-    color: #bfa046;
-    background: linear-gradient(90deg, #181c1f 60%, #232a34 100%);
-    font-size: 1rem;
-    border-top: 1.5px solid #bfa04633;
-    margin-top: 3rem;
-}
-.footer a {
-    color: #ffe082;
-    text-decoration: underline;
-    transition: color 0.2s;
-}
-.footer a:hover {
-    color: #bfa046;
-}
-
-/* Responsive */
-@media (max-width: 700px) {
-    .feature-list {
-        flex-direction: column;
-        gap: 1.2rem;
-    }
-    .features {
-        padding: 1.2rem 0.2rem;
-    }
-    .feature-card {
-        width: 95%;
-        margin: 0 auto;
-    }
-    .title {
-        font-size: 2.1rem;
-    }
-}
-  </style>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ina's New World Bot</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Lato', sans-serif;
+            background-color: #181a1b; /* Dark, slightly desaturated */
+            color: #e0e0e0; /* Light parchment/gray */
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            width: 80%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header, footer {
+            text-align: center;
+            padding: 20px 0;
+        }
+        header img.logo {
+            width: 150px;
+            margin-bottom: 10px;
+        }
+        h1, h2, h3 {
+            font-family: 'Cinzel', serif;
+            color: #c8a2c8; /* Muted Lilac - Syndicate Purple hint */
+            margin-top: 1.5em;
+            margin-bottom: 0.8em;
+            border-bottom: 1px solid #4a4a4a;
+            padding-bottom: 0.3em;
+        }
+        h1 {
+            font-size: 2.8em;
+            text-align: center;
+            color: #daa520; /* Goldenrod for main title */
+            border-bottom: none;
+        }
+        h2 {
+            font-size: 2em;
+        }
+        h3 {
+            font-size: 1.5em;
+            color: #b8860b; /* Darker Gold for sub-subheadings */
+        }
+        p {
+            margin-bottom: 1em;
+        }
+        .tagline {
+            text-align: center;
+            font-size: 1.2em;
+            color: #b0b0b0;
+            margin-bottom: 2em;
+        }
+        .invite-button-container {
+            text-align: center;
+            margin: 20px 0 30px 0;
+        }
+        a {
+            color: #87ceeb; /* Sky Blue for links */
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        ul li {
+            background-color: #222425;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-left: 3px solid #daa520; /* Goldenrod accent */
+            border-radius: 4px;
+        }
+        ul li ul li { /* Nested lists in setup */
+            background-color: #2a2c2d;
+            border-left-color: #c8a2c8;
+            margin-top: 8px;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #2c2f33; /* Darker code background */
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.9em;
+            color: #f0f0f0; /* Lighter code text */
+        }
+        pre {
+            background-color: #2c2f33;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #444;
+        }
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            font-size: 0.9em;
+        }
+        hr {
+            border: 0;
+            height: 1px;
+            background: #4a4a4a;
+            margin: 40px 0;
+        }
+        footer small {
+            font-size: 0.9em;
+            color: #888;
+        }
+        .text-center {
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-  <!-- Hero Section -->
-<header class="hero">
-    <img src="src/images/logo.png" alt="Ina Discord Bot Logo" class="logo-glow" />
-    <h1 class="title">Ina Discord Bot</h1>
-    <p class="subtitle">Your New World MMO Companion for Discord</p>
-    <a href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot" class="cta-btn">Summon Ina to Your Server</a>
-</header>
+    <div class="container">
+        <header>
+            <a href="https://github.com/involvex/ina-discord-bot-">
+                <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/docs/src/images/logo.png" alt="Ina's New World Bot Logo" class="logo"/>
+            </a>
+            <h1>Ina's New World Bot</h1>
+        </header>
 
-<!-- Features Section -->
-<section class="features">
-    <h2>Bot Features</h2>
-    <div class="feature-list">
-        <div class="feature-card">
-            <span class="feature-icon">🗺️</span>
-            <h3>New World Themed Commands</h3>
-            <p>Interact with commands inspired by the lands of Aeternum, including <b>/petpet</b> and <b>/help</b> with immersive flavor text.</p>
+        <p class="tagline">
+            Your indispensable <strong>Aeternum</strong> companion for Discord.<br>
+            Uncover secrets, manage your arsenal, and conquer the island!
+        </p>
+
+        <div class="invite-button-container">
+            <a href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8" target="_blank" rel="noopener">
+                <img src="https://img.shields.io/badge/%F0%9F%A4%96%20Invite%20Ina%20to%20Your%20Server-3A6EA5?style=for-the-badge&logo=discord&logoColor=white" alt="Invite Ina to Your Server">
+            </a>
         </div>
-        <div class="feature-card">
-            <span class="feature-icon">⚔️</span>
-            <h3>Adventure Ready</h3>
-            <p>Perfect for guilds, expeditions, and roleplay. Bring the spirit of New World to your Discord community.</p>
-        </div>
-        <div class="feature-card">
-            <span class="feature-icon">✨</span>
-            <h3>Modern & Beautiful</h3>
-            <p>Dark fantasy design, glowing gold highlights, and a magical user experience.</p>
-        </div>
-        <div class="feature-card">
-            <span class="feature-icon">📜</span>
-            <h3>Comprehensive Documentation</h3>
-            <p>Easy-to-follow guides and reference, themed for the New World adventurer.</p>
-        </div>
+
+        <main>
+            <section id="features">
+                <h2>✨ Key Features</h2>
+                <ul>
+                    <li><strong>Deep Dive Database:</strong> Instantly access detailed information on New World items, perks, and recipes. (e.g., <code>/nwdb</code>, <code>/perk</code>, <code>/recipe</code>)</li>
+                    <li><strong>Strategic Crafting:</strong> Calculate materials for crafts, view full recipe breakdowns, and determine exact costs for your crafting endeavors. (e.g., <code>/calculate_craft</code>, <code>/recipe</code>)</li>
+                    <li><strong>Build Management:</strong> Save, share, and manage your favorite New World builds from <code>nw-buddy.de</code>. (e.g., <code>/build add</code>, <code>/build list</code>)</li>
+                    <li><strong>Server Enhancements:</strong> Enhance your server with optional welcome messages for new members and activity logging.</li>
+                    <li><strong>Aeternum Fun:</strong> Engage with fun commands, including the legendary <code>/petpet</code> ritual and more!</li>
+                    <li><strong>Bot Administration:</strong> Tools for bot owners and administrators to manage the bot, including permissions and updates.</li>
+                    <li><strong>Automatic Updates:</strong> Configure Ina to check for and apply updates to herself (requires specific server-side setup).</li>
+                    <li><strong>Always Evolving:</strong> Regularly updated with new features, improvements, and the latest New World game data.</li>
+                </ul>
+            </section>
+
+            <section id="commands">
+                <h2>Commands</h2>
+                <p>Here's a list of available commands. Use <code>/help [command_name]</code> in Discord for more details on a specific command.</p>
+
+                <h3>General Commands</h3>
+                <ul>
+                    <li><code>/ping</code>: Check if the bot is online.</li>
+                    <li><code>/help [command_name]</code>: Show available commands or help for a specific command.</li>
+                    <li><code>/petpet &lt;user&gt;</code>: Give a New World petting ritual to a user!</li>
+                    <li><code>/calculate &lt;expression&gt;</code>: Perform a calculation with New World magic!</li>
+                    <li><code>/about</code>: Show information about Ina's New World Bot.</li>
+                </ul>
+
+                <h3>New World Specific Commands</h3>
+                <ul>
+                    <li><code>/nwdb &lt;item_name&gt;</code>: Look up items from New World Database.</li>
+                    <li><code>/perk &lt;perk_name&gt;</code>: Look up information about a specific New World perk.</li>
+                    <li><code>/recipe &lt;item_name&gt;</code>: Show the full recipe breakdown for a craftable item.</li>
+                    <li><code>/calculate_craft &lt;item_name&gt; [amount]</code>: Calculate resources needed to craft an item, including intermediates.</li>
+                </ul>
+
+                <h3>Build Management</h3>
+                <ul>
+                    <li><code>/build add &lt;link&gt; &lt;name&gt; [keyperks]</code>: Add a build from nw-buddy.de.</li>
+                    <li><code>/build list</code>: Show a list of saved builds.</li>
+                    <li><code>/build remove &lt;name&gt;</code>: Remove a saved build. (Requires: Manage Server or Bot Manager)</li>
+                </ul>
+
+                <h3>Management &amp; Settings (Require Permissions)</h3>
+                <ul>
+                    <li><code>/manage update</code>: Pulls updates from GitHub and restarts the bot. (Requires: Bot Owner)</li>
+                    <li><code>/manage restart</code>: Shuts down the bot for manual restart. (Requires: Bot Owner/Manager)</li>
+                    <li><code>/settings permit &lt;user&gt;</code>: Grants a user bot management permissions. (Requires: Server Admin or Bot Owner)</li>
+                    <li><code>/settings unpermit &lt;user&gt;</code>: Revokes a user's bot management permissions. (Requires: Server Admin or Bot Owner)</li>
+                    <li><code>/settings listmanagers</code>: Lists users with bot management permissions. (Requires: Server Admin or Bot Manager/Owner)</li>
+                    <li><code>/settings welcomemessages &lt;action&gt; [channel]</code>: Manage welcome messages. Actions: enable, disable, status. (Requires: Manage Server or Bot Manager/Owner)</li>
+                    <li><code>/settings logging &lt;action&gt; [channel]</code>: Manage server activity logging. Actions: enable, disable, status. (Requires: Manage Server or Bot Manager/Owner)</li>
+                </ul>
+            </section>
+
+            <section id="setup">
+                <h2>Setup</h2>
+                <ol style="list-style-type: decimal; padding-left: 20px;">
+                    <li style="background:none; padding: 5px 0; border:none;">Clone the repository.</li>
+                    <li style="background:none; padding: 5px 0; border:none;">Install dependencies: <code>pip install -r requirements.txt</code></li>
+                    <li style="background:none; padding: 5px 0; border:none;">Create a <code>.env</code> file in the root directory with your <code>BOT_TOKEN</code>. Example:
+                        <pre><code>BOT_TOKEN=YOUR_DISCORD_BOT_TOKEN_HERE</code></pre>
+                    </li>
+                    <li style="background:none; padding: 5px 0; border:none;">The bot uses a SQLite database (<code>new_world_data.db</code>) for item, perk, and recipe data. If this file is not present when the bot starts, it will attempt to automatically create and populate it by downloading the necessary data from the internet. This process may take a few moments on the first run.</li>
+                    <li style="background:none; padding: 5px 0; border:none;">Run the bot: <code>python main.py</code></li>
+                </ol>
+                <p>For automatic updates, ensure <code>update_bot.ps1</code> (Windows) or <code>update_bot.sh</code> (Linux) is executable and correctly configured for your environment. The bot also needs a process manager (like PM2 or systemd) to restart it after an update.</p>
+            </section>
+
+            <section id="important-links">
+                <h2>Important Links</h2>
+                <ul>
+                    <li><a href="https://github.com/involvex/ina-discord-bot-" target="_blank" rel="noopener">View on GitHub</a></li>
+                    <li><a href="https://involvex.github.io/ina-discord-bot-/" target="_blank" rel="noopener">Project Documentation</a></li>
+                    <li><a href="https://www.newworld.com/" target="_blank" rel="noopener">Official New World Site</a></li>
+                </ul>
+            </section>
+
+            <hr>
+        </main>
+
+        <footer>
+            <p><small>Crafted with Azoth for the New World community &copy; 2024. Ina's Bot is a fan project and not affiliated with Amazon Games.</small></p>
+        </footer>
     </div>
-</section>
-
-  <footer class="footer">
-    <p>© 2025 Ina Discord Bot &middot; Inspired by New World MMO &middot; <a href="https://github.com/involvex/ina-discord-bot-">GitHub</a></p>
-  </footer>
 </body>
 </html>

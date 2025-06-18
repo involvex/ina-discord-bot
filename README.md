@@ -75,7 +75,7 @@ For automatic updates, ensure `update_bot.ps1` (Windows) or `update_bot.sh` (Lin
 ## Important Links
 
 *   View on GitHub
-*   [Project Documentation](https://your-documentation-url-here) <!-- Or remove if README is the main doc -->
+*   [Project Documentation](https://involvex.github.io/ina-discord-bot-/) <!-- Or remove if README is the main doc -->
 *   Official New World Site
 
 ---
