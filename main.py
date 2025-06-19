@@ -361,13 +361,31 @@ async def nwdb_autocomplete(ctx: AutocompleteContext): # Corrected type hint for
             conn.close()
     await ctx.send(choices=choices)
 
+import json
+
 @slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
 @slash_option("fort_bonus", "Fort bonus (yes/no, optional)", opt_type=OptionType.BOOLEAN, required=False)
 @slash_option("armor_bonus", "Armor bonus % (2-10, optional)", opt_type=OptionType.NUMBER, required=False)
 @slash_option("tradeskill", "Tradeskill (1-250, optional)", opt_type=OptionType.INTEGER, required=False)
-async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool = False, armor_bonus: float = 0, tradeskill: int = 1):
+async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: bool = None, armor_bonus: float = None, tradeskill: int = None):
+    # Load user defaults
+    user_id = str(ctx.author.id)
+    defaults_path = "user_craft_defaults.json"
+    try:
+        with open(defaults_path, "r", encoding="utf-8") as f:
+            user_defaults = json.load(f)
+    except Exception:
+        user_defaults = {}
+    user_last = user_defaults.get(user_id, {})
+    # Use last values if not provided
+    item_name = item_name or user_last.get("item_name", "")
+    amount = amount if amount is not None else user_last.get("amount", 1)
+    fort_bonus = fort_bonus if fort_bonus is not None else user_last.get("fort_bonus", False)
+    armor_bonus = armor_bonus if armor_bonus is not None else user_last.get("armor_bonus", 0)
+    tradeskill = tradeskill if tradeskill is not None else user_last.get("tradeskill", 1)
+
     await ctx.defer() # Defer response
     recipe_details = None
     try:
@@ -389,16 +407,26 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
     if not all_materials:
         await ctx.send(f"Could not calculate materials for '{item_name}'. Ensure it's a craftable item with a known recipe.", ephemeral=True)
         return
+    # Save user defaults
+    user_defaults[user_id] = {
+        "item_name": item_name,
+        "amount": amount,
+        "fort_bonus": fort_bonus,
+        "armor_bonus": armor_bonus,
+        "tradeskill": tradeskill
+    }
+    try:
+        with open(defaults_path, "w", encoding="utf-8") as f:
+            json.dump(user_defaults, f, indent=2)
+    except Exception:
+        pass
     # Apply bonuses
     armor_bonus = max(0, min(armor_bonus or 0, 10))
     tradeskill = max(1, min(tradeskill or 1, 250))
-    # Fort bonus: 10% if yes, 0% if no
     fort_bonus_pct = 10 if fort_bonus else 0
-    # Tradeskill bonus: 0% at 1, 300% at 250 (linear)
     tradeskill_bonus_pct = (tradeskill - 1) * (300 / 249) if tradeskill > 1 else 0
     total_bonus = fort_bonus_pct + armor_bonus + tradeskill_bonus_pct
     bonus_factor = 1 - (total_bonus / 100)
-    # Prepare beautified embed
     embed = Embed()
     embed.title = f"Crafting: {item_name.title()}"
     embed.color = 0x4CAF50
@@ -408,8 +436,6 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
         embed.add_field(name="Armor Bonus", value=f"{armor_bonus:.1f}%", inline=True)
     if tradeskill:
         embed.add_field(name="Tradeskill", value=f"{tradeskill} ({tradeskill_bonus_pct:.1f}% bonus)", inline=True)
-
-    # Set embed thumbnail to the crafted item's icon (if available)
     crafted_item_icon = None
     try:
         item_results = await find_item_in_db(item_name, exact_match=True)
@@ -419,8 +445,6 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
         crafted_item_icon = None
     if crafted_item_icon:
         embed.set_thumbnail(url=crafted_item_icon)
-
-    # Emoji map for common materials
     MATERIAL_EMOJIS = {
         "prismatic leather": "🟣",
         "iron ingot": "⛓️",
@@ -431,10 +455,7 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
         "stone": "🪨",
         "gold ingot": "🥇",
         "silver ingot": "🥈",
-        # Add more as desired
     }
-
-    # Section: Materials (beautified, single field per material)
     if all_materials:
         embed.add_field(name="Materials", value="", inline=False)
         for mat, qty in all_materials.items():
