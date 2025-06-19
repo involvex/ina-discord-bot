@@ -126,7 +126,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.106" 
+__version__ = "0.2.107" 
 
 # --- Logging Configuration ---
 DEFAULT_LOG_LEVEL = logging.INFO
@@ -356,7 +356,9 @@ async def help_command(ctx, command: Optional[str] = None):
 
         for category_name in category_order:
             if category_name in categorized_commands:
-                commands_in_category = categorized_commands[category_name]
+                if category_name == "Management" and ctx.author.id != OWNER_ID:
+                    continue # Skip the Management category if user is not the owner
+                commands_in_category = categorized_commands[category_name] # Now this is safe
                 field_value = "\n".join(commands_in_category)
                 field_name = f"**{category_name}**"
 
