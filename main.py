@@ -364,40 +364,54 @@ async def nwdb_autocomplete(ctx: AutocompleteContext): # Corrected type hint for
 @slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
-async def calculate_craft(ctx, item_name: str, amount: int = 1):
+@slash_option("fort_bonus", "Fort bonus % (optional)", opt_type=OptionType.NUMBER, required=False)
+@slash_option("armor_bonus", "Armor bonus % (2-10, optional)", opt_type=OptionType.NUMBER, required=False)
+async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: float = 0, armor_bonus: float = 0):
     await ctx.defer() # Defer response
-    # The get_recipe and calculate_crafting_materials functions (from recipes.py)
-    # are responsible for querying the SQLite database (new_world_data.db).
-
     recipe_details = None
     try:
-        # Fetch recipe details from the database via recipes.py.
-        recipe_details = get_recipe(item_name) 
-    except Exception as e: # Catch any unexpected error during recipe fetching
+        recipe_details = get_recipe(item_name)
+    except Exception as e:
         logging.error(f"Unexpected error in calculate_craft calling get_recipe for '{item_name}': {e}", exc_info=True)
         await ctx.send(f"An unexpected error occurred while fetching recipe details for '{item_name}'. Please contact an admin.", ephemeral=True)
         return
-
-    if not recipe_details: # If get_recipe returns None or empty
+    if not recipe_details:
         await ctx.send(f"Recipe for '{item_name}' not found or item is not craftable.", ephemeral=True)
         return
-    
     all_materials = None
     try:
-        # Calculate all materials, including intermediates, using data from the database via recipes.py.
         all_materials = calculate_crafting_materials(item_name, amount or 1, include_intermediate=True)
-    except Exception as e: # Catch any unexpected error during material calculation
+    except Exception as e:
         logging.error(f"Unexpected error in calculate_craft calling calculate_crafting_materials for '{item_name}': {e}", exc_info=True)
         await ctx.send(f"An unexpected error occurred while calculating materials for '{item_name}'. Please contact an admin.", ephemeral=True)
         return
-
-    if not all_materials: # If calculate_crafting_materials returns None or empty
+    if not all_materials:
         await ctx.send(f"Could not calculate materials for '{item_name}'. Ensure it's a craftable item with a known recipe.", ephemeral=True)
         return
-    lines = [f"To craft {amount or 1} **{item_name.title()}** you need (including intermediates):"]
+    # Apply bonuses
+    fort_bonus = max(0, min(fort_bonus or 0, 100))
+    armor_bonus = max(0, min(armor_bonus or 0, 10))
+    bonus_factor = (1 - (fort_bonus + armor_bonus) / 100)
+    # Prepare beautified embed
+    embed = Embed()
+    embed.title = f"Crafting: {item_name.title()}"
+    embed.color = 0x4CAF50
+    embed.add_field(name="Amount", value=str(amount or 1), inline=True)
+    if fort_bonus:
+        embed.add_field(name="Fort Bonus", value=f"{fort_bonus:.1f}%", inline=True)
+    if armor_bonus:
+        embed.add_field(name="Armor Bonus", value=f"{armor_bonus:.1f}%", inline=True)
+    embed.add_field(name="Base Materials", value="", inline=False)
     for mat, qty in all_materials.items():
-        lines.append(f"• {qty} {mat.title()}")
-    await ctx.send("\n".join(lines))
+        embed.add_field(name=mat.title(), value=f"{qty}", inline=True)
+    if fort_bonus or armor_bonus:
+        embed.add_field(name="\u200b", value="\u200b", inline=False)
+        embed.add_field(name="**With Bonuses Applied**", value="", inline=False)
+        for mat, qty in all_materials.items():
+            adj_qty = max(1, int(round(qty * bonus_factor)))
+            embed.add_field(name=mat.title(), value=f"{adj_qty}", inline=True)
+    embed.set_footer(text="Bonuses reduce the required materials. Minimum per material is 1.")
+    await ctx.send(embeds=embed)
 
 
 @calculate_craft.autocomplete("item_name")
