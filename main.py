@@ -125,7 +125,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.103" 
+__version__ = "0.2.104" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -901,7 +901,7 @@ async def perk_command(ctx, perk_name: str):
         
     # Add "Scales with Gear Score" note if placeholders were in description, indicating bot performed scaling.
     # This can apply to any perk if its description in the DB uses the scaling placeholder.
-    if '${' in str(description_raw):
+    if re.search(r'\{\[.*?\]\}', str(description_raw)):
         embed.add_field(name="Scaling", value="Values scale with Gear Score (shown at 725 GS)", inline=True)
 
     # These fields will now be attempted for ALL perks if data is available
