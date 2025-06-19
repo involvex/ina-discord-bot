@@ -467,7 +467,9 @@ async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: b
         items_path = os.path.join(os.path.dirname(__file__), "items_updated.json")
         try:
             with open(items_path, "r", encoding="utf-8") as f:
-                calculate_craft._items_cache = _json.load(f)
+                raw_items = _json.load(f)
+                # Filter out any non-dict entries
+                calculate_craft._items_cache = [item for item in raw_items if isinstance(item, dict)]
         except Exception:
             calculate_craft._items_cache = []
     items_data = calculate_craft._items_cache
