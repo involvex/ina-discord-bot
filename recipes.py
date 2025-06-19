@@ -176,38 +176,41 @@ def _calculate_materials_recursive(
     item_name: str, 
     quantity_needed: int, 
     recipe_cache: Dict[str, Optional[Dict[str, Any]]], 
-    processed_for_cycle_detection: Set[str]
+    processed_for_cycle_detection: Set[str],
+    depth: int = 0,
+    max_depth: int = 20  # Set a reasonable max depth
 ) -> Dict[str, int]:
+    if depth > max_depth:
+        logging.warning(f"Max recursion depth reached for item: {item_name}. Treating as base material.")
+        return {item_name: quantity_needed}
     if item_name in processed_for_cycle_detection:
         logging.warning(f"Crafting cycle detected for item: {item_name}. Treating as base material.")
         return {item_name: quantity_needed}
 
     processed_for_cycle_detection.add(item_name)
-
     recipe = recipe_cache.get(item_name)
-    if item_name not in recipe_cache: # Not yet fetched for this calculation run
-        recipe = get_recipe(item_name) # Fetches from DB
+    if item_name not in recipe_cache:
+        recipe = get_recipe(item_name)
         recipe_cache[item_name] = recipe
 
     base_materials: Dict[str, int] = {}
 
-    if not recipe or not recipe.get("ingredients"): # Base material or no recipe
+    if not recipe or not recipe.get("ingredients"):
         base_materials[item_name] = base_materials.get(item_name, 0) + quantity_needed
     else:
         for ingredient_info in recipe["ingredients"]:
             sub_item_name = ingredient_info["item"]
             sub_item_quantity_per_craft = ingredient_info["quantity"]
             sub_item_total_needed = sub_item_quantity_per_craft * quantity_needed
-            
+
             sub_materials_for_ingredient = _calculate_materials_recursive(
-                sub_item_name, sub_item_total_needed, recipe_cache, processed_for_cycle_detection
+                sub_item_name, sub_item_total_needed, recipe_cache, processed_for_cycle_detection, depth + 1, max_depth
             )
             for mat, qty in sub_materials_for_ingredient.items():
                 base_materials[mat] = base_materials.get(mat, 0) + qty
-    
+
     processed_for_cycle_detection.remove(item_name)
     return base_materials
-
 
 def calculate_crafting_materials(item_name: str, quantity: int = 1, include_intermediate: bool = False) -> Optional[Dict[str, int]]:
     try:
