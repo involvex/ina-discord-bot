@@ -398,28 +398,14 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
 
 
 @calculate_craft.autocomplete("item_name")
-async def calculate_craft_autocomplete(ctx: AutocompleteContext): # Corrected type hint
+async def calculate_craft_autocomplete(ctx: AutocompleteContext):
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-
     if not search_term:
         await ctx.send(choices=[])
         return
-
-    conn = get_db_connection()
-    matches = []
-    try:
-        cursor = conn.cursor()
-        # Query 'output_item_name' from the 'recipes' table. This column is defined in create_db.py.
-        cursor.execute("SELECT output_item_name FROM recipes WHERE lower(output_item_name) LIKE ? LIMIT 25", ('%' + search_term + '%',))
-        db_matches = cursor.fetchall()
-        # Ensure output_item_name is correctly cased for display and as the value.
-        matches = [row["output_item_name"] for row in db_matches]
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error in calculate_craft_autocomplete: {e}")
-    finally:
-        if conn:
-            conn.close()
-    choices = [{"name": name, "value": name} for name in matches]
+    from db_utils import find_item_in_db
+    items = await find_item_in_db(search_term, exact_match=False)
+    choices = [{"name": item["Name"], "value": item["Name"]} for item in items[:25]]
     await ctx.send(choices=choices)
 
 
@@ -483,9 +469,15 @@ async def recipe(ctx, item_name: str):
 
 
 @recipe.autocomplete("item_name")
-async def recipe_autocomplete(ctx: AutocompleteContext): # Corrected type hint
-    # This can reuse the logic from calculate_craft_autocomplete as both search craftable items
-    await calculate_craft_autocomplete(ctx)
+async def recipe_autocomplete(ctx: AutocompleteContext):
+    search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
+    if not search_term:
+        await ctx.send(choices=[])
+        return
+    from db_utils import find_item_in_db
+    items = await find_item_in_db(search_term, exact_match=False)
+    choices = [{"name": item["Name"], "value": item["Name"]} for item in items[:25]]
+    await ctx.send(choices=choices)
 
 # --- Build Management Commands ---
 @slash_command(name="build", description="Manage saved New World builds.")
