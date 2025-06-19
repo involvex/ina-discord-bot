@@ -3,279 +3,47 @@ import sys
 import random
 import logging
 import asyncio
-import uuid
-import math
 import subprocess
 import platform # For OS detection
 import re
 import time # For uptime tracking
-# import items # No longer needed for direct data loading
-# import perks # No longer needed for direct data loading
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role, AutocompleteContext
+from interactions import slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role, AutocompleteContext
 from interactions.models.discord.channel import GuildText # For specific channel type checking
 from interactions.api.events.discord import MessageCreate # Import the event type
 from typing import Optional
 import packaging.version  # For version comparison
-from recipes import get_recipe, calculate_crafting_materials, track_recipe
-from utils.image_utils import generate_petpet_gif
 import json
-from bs4 import BeautifulSoup
 import requests
-import shutil # Added for rmtree
-# In your main.py or a data_manager.py
 import sqlite3 # Added for DB interaction
-# import os # Already imported
+import datetime # For timestamps in logs
 
-DB_NAME = "new_world_data.db" # Path to your SQLite DB
-
-def get_db_connection():
-    # Check if DB exists, if not, try to create it by calling populate_db()
-    # The primary check and creation attempt is now in load_all_game_data()
-    if not os.path.exists(DB_NAME):
-        # This log indicates that despite startup checks, the DB is still missing when a command needs it.
-        logging.error(f"get_db_connection: Database '{DB_NAME}' not found when attempting to connect. Data-dependent features will fail.")
-        # SQLite will attempt to create an empty DB file if it doesn't exist and has permissions,
-        # but our tables wouldn't be there. Commands need to handle this.
-
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row # To access columns by name
-    return conn
-
-async def find_item_in_db(item_name_query: str, exact_match: bool = False):
-    # Ensure DB exists before trying to connect
-    if not os.path.exists(DB_NAME):
-        logging.error(f"find_item_in_db: Database {DB_NAME} not found.")
-        return [] 
-
-    conn = get_db_connection()
-    results = []
-    try:
-        cursor = conn.cursor()
-        # Column names are sanitized by create_db.py (e.g., 'Item Name' -> 'Item_Name').
-        # We assume the primary human-readable name column is 'Name' after sanitization or was 'Name' in CSV.
-        if exact_match:
-             cursor.execute("SELECT * FROM items WHERE Name = ?", (item_name_query,))
-        else:
-             cursor.execute("SELECT * FROM items WHERE Name LIKE ?", ('%' + item_name_query + '%',))
-        items = cursor.fetchall()
-        results = [dict(row) for row in items]
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error in find_item_in_db: {e}")
-        # Handle specific errors, e.g., table not found if DB isn't populated
-        if "no such table" in str(e):
-             logging.error(f"Table 'items' not found in {DB_NAME}. Database might be empty or not correctly populated.")
-        return [] 
-    finally:
-        if conn:
-            conn.close()
-    return results
-
-
-# Your command would then call find_item_in_db(item_name)
-
-# --- Function to find perks in DB ---
-async def find_perk_in_db(perk_name_query: str, exact_match: bool = False):
-    if not os.path.exists(DB_NAME):
-        logging.error(f"find_perk_in_db: Database {DB_NAME} not found.")
-        return []
-    conn = get_db_connection()
-    results = []
-    try:
-        cursor = conn.cursor()
-        # Assuming the main perk name column in perks.csv becomes 'Name' after sanitization by create_db.py.
-        if exact_match:
-            cursor.execute("SELECT * FROM perks WHERE Name = ?", (perk_name_query,))
-        else:
-            cursor.execute("SELECT * FROM perks WHERE Name LIKE ?", ('%' + perk_name_query + '%',))
-        perks_data = cursor.fetchall()
-        results = [dict(row) for row in perks_data]
-    except sqlite3.Error as e:
-        logging.error(f"SQLite error in find_perk_in_db: {e}")
-        if "no such table" in str(e):
-            logging.error(f"Table 'perks' not found in {DB_NAME}. Database might be empty or not correctly populated.")
-        return []
-    finally:
-        if conn:
-            conn.close()
-
-    # Attempt immediate re-scraping/re-import of data on a "not found" result for more recent bot data
-    # Note: In a production bot, you might want to rate-limit or restrict who/when this is allowed for performance/data integrity
-    if not results:
-        logging.info(
-            f"No perk '{perk_name_query}' found in database, attempting to auto-run perk data update."
-        )
-        current_os = platform.system().lower()
-        if "windows" in current_os:
-            update_perks_script = os.path.abspath(os.path.join(os.path.dirname(__file__), "update_perks.ps1"))
-            subprocess.run(["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", update_perks_script], capture_output=True, text=True)
-        elif "linux" in current_os:
-            update_perks_script = os.path.abspath(os.path.join(os.path.dirname(__file__), "update_perks.sh"))
-            subprocess.run(["/bin/bash", update_perks_script], capture_output=True, text=True)
-        else:
-            logging.warning(f"Unsupported OS ({current_os}) for running update_perks script. Manual intervention needed")
-            return results  # Return current empty results
-
-        # Re-query now - the script SHOULD have re-scraped and updated the DB if it worked.
-        results = await find_perk_in_db(perk_name_query, exact_match=exact_match)
-        if results:
-            logging.info(f"Automatic perk update succeeded. '{perk_name_query}' found in updated data.")
-
-    return results
+from bot_client import bot # Import the bot instance 
+__version__ = "0.2.11"
+from config import (
+    __version__ as config_version, # Import with an alias
+    BOT_START_TIME, DEFAULT_LOG_LEVEL, DEBUG_MODE_ENABLED,
+    DB_NAME, OWNER_ID, BUILDS_FILE,
+    GITHUB_REPO_OWNER, GITHUB_REPO_NAME, GITHUB_VERSION_FILE_URL, UPDATE_CHECK_INTERVAL_SECONDS,
+    NEW_WORLD_WELCOME_MESSAGES, NW_FUNNY_STATUSES, SILLY_UPTIME_MESSAGES, BOT_INVITE_URL, SILLY_MENTION_RESPONSES,
+    setup_logging
+)
+__version__ = config_version # Make it available in main.py for scripts that expect it here
+from common_utils import format_uptime, scale_value_with_gs, _cleanup_cache_files_recursive # Renamed import
+from settings_manager import (
+    save_welcome_setting, get_welcome_setting,
+    save_logging_setting, get_logging_setting,
+    is_bot_manager, add_bot_manager, remove_bot_manager, load_bot_managers
+)
+from db_utils import find_item_in_db, find_perk_in_db, get_db_connection
+from recipes import get_recipe, calculate_crafting_materials, track_recipe # track_recipe uses its own JSON
+from utils.image_utils import generate_petpet_gif # Assuming this path is correct
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
-import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.108" 
-BOT_START_TIME = time.time() # Record bot start time
-
 # --- Logging Configuration ---
-DEFAULT_LOG_LEVEL = logging.INFO
-DEBUG_MODE_ENABLED = False # Tracks if debug mode is active
-
-logging.basicConfig(
-    level=DEFAULT_LOG_LEVEL, 
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-# Set interactions.py library logger level
-interactions_logger = logging.getLogger("interactions")
-interactions_logger.setLevel(DEFAULT_LOG_LEVEL)
-bot_token = os.getenv("BOT_TOKEN")
-if not bot_token:
-    print("Error: BOT_TOKEN not found in .env file. Please make sure it is set.")
-    sys.exit(1)
-
-bot = Client(token=bot_token)
-
-BUILDS_FILE = 'saved_builds.json' # Kept separate for user-generated content
-MASTER_SETTINGS_FILE = 'bot_settings.json'
-OWNER_ID = 157968227106947072 # Your Discord User ID
-
-# --- Update Checker Configuration ---
-GITHUB_REPO_OWNER = "involvex"
-GITHUB_REPO_NAME = "ina-discord-bot-" # Added trailing hyphen
-# URL to a file on the main branch containing the version string (e.g., "0.1.1")
-GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
-UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Periodic check interval (e.g., every 6 hours)
-
-# --- Welcome Messages ---
-NEW_WORLD_WELCOME_MESSAGES = [
-    "Welcome to {guild_name}, {member_mention}! Grab your Azoth staff, a new adventure begins!",
-    "A new challenger has arrived in {guild_name}! Welcome, {member_mention}! May your loot be epic.",
-    "By the Spark, {member_mention} has joined us in {guild_name}! Watch out for those turkeys.",
-    "{member_mention} just fast-traveled into {guild_name}! Hope you brought enough repair parts.",
-    "The Corrupted didn't get this one! Welcome to {guild_name}, {member_mention}!",
-    "Fresh off the boat and into {guild_name}! Welcome, {member_mention}. Try not to aggro everything.",
-    "Look out, Aeternum, {member_mention} has arrived in {guild_name}! Let the grind commence.",
-    "Is that a new Syndicate spy, {member_mention}? Or just a friendly adventurer joining {guild_name}? Welcome!",
-    "Welcome, {member_mention}! May your bags be heavy and your Azoth always full here in {guild_name}.",
-    "{member_mention} has breached the gates of {guild_name}! Prepare for glory (and maybe some lag).",
-]
-
-# --- Global Data Stores ---
-# ITEM_DATA = {} # Replaced by SQLite DB
-# ALL_PERKS_DATA = {} # Replaced by SQLite DB
-# ITEM_ID_TO_NAME_MAP = {} # Replaced by SQLite DB queries or direct recipe data
-
-# --- Master Settings Helper Functions ---
-def load_master_settings():
-    """Loads all settings from the master JSON file. Creates it with defaults if not found."""
-    try:
-        with open(MASTER_SETTINGS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        # Return a default structure if file doesn't exist or is invalid
-        default_settings = {
-            "bot_managers": [],
-            "guild_settings": {} # Guild-specific settings will be nested here
-        }
-        save_master_settings(default_settings) # Create the file with defaults
-        return default_settings
-
-def save_master_settings(settings_data):
-    """Saves the provided settings data to the master JSON file."""
-    with open(MASTER_SETTINGS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(settings_data, f, indent=4)
-
-
-# --- Bot Manager Helper Functions ---
-def load_bot_managers():
-    """Loads bot manager IDs from the master settings file."""
-    settings = load_master_settings()
-    return settings.get("bot_managers", [])
-
-def save_bot_managers(managers_list):
-    """Saves the bot managers list to the master settings file."""
-    settings = load_master_settings()
-    settings["bot_managers"] = managers_list
-    save_master_settings(settings)
-
-# --- Welcome Message Helper Functions (using master settings) ---
-def save_welcome_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
-    """Saves welcome message settings for a specific guild in the master settings file."""
-    settings = load_master_settings()
-    guild_id_str = str(guild_id)
-
-    guild_specific_settings = settings.setdefault("guild_settings", {})
-    this_guild_settings = guild_specific_settings.setdefault(guild_id_str, {})
-    
-    this_guild_settings["welcome"] = {
-        "enabled": enabled,
-        "channel_id": str(channel_id) if channel_id else None
-    }
-    save_master_settings(settings)
-
-def get_welcome_setting(guild_id: str) -> Optional[dict]:
-    """Gets welcome message settings for a specific guild from the master settings file."""
-    settings = load_master_settings()
-    return settings.get("guild_settings", {}).get(str(guild_id), {}).get("welcome")
-
-# --- Logging Helper Functions (using master settings) ---
-def save_logging_setting(guild_id: str, enabled: bool, channel_id: Optional[str]):
-    """Saves server activity logging settings for a specific guild in the master settings file."""
-    settings = load_master_settings()
-    guild_id_str = str(guild_id)
-
-    guild_specific_settings = settings.setdefault("guild_settings", {})
-    this_guild_settings = guild_specific_settings.setdefault(guild_id_str, {})
-
-    this_guild_settings["logging"] = {
-        "enabled": enabled,
-        "channel_id": str(channel_id) if channel_id else None
-    }
-    save_master_settings(settings)
-
-def get_logging_setting(guild_id: str) -> Optional[dict]:
-    """Gets server activity logging settings for a specific guild from the master settings file."""
-    settings = load_master_settings()
-    return settings.get("guild_settings", {}).get(str(guild_id), {}).get("logging")
-
-
-def is_bot_manager(user_id: int) -> bool:
-    """Checks if a user is the owner or a permitted bot manager."""
-    if user_id == OWNER_ID:
-        return True
-    managers = load_bot_managers()
-    return user_id in managers
-
-def add_bot_manager(user_id: int) -> bool:
-    """Adds a user to the bot managers list. Returns True if added, False if already present."""
-    managers = load_bot_managers()
-    if user_id not in managers:
-        managers.append(user_id)
-        save_bot_managers(managers)
-        return True
-    return False
-
-def remove_bot_manager(user_id: int) -> bool:
-    """Removes a user from the bot managers list. Returns True if removed, False if not found."""
-    managers = load_bot_managers()
-    if user_id in managers:
-        managers.remove(user_id)
-        save_bot_managers(managers)
-        return True
-    return False
+setup_logging() # Initialize logging
 
 @slash_command("ping", description="Check if the bot is online.")
 async def ping(ctx):
@@ -421,26 +189,6 @@ async def calculate(ctx, expression: str):
     except Exception as e:
         await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
 
-def format_uptime(seconds: float) -> str:
-    """Formats a duration in seconds into a human-readable string (Xd Yh Zm Ws)."""
-    days = int(seconds // (24 * 3600))
-    seconds %= (24 * 3600)
-    hours = int(seconds // 3600)
-    seconds %= 3600
-    minutes = int(seconds // 60)
-    seconds = int(seconds % 60)
-
-    parts = []
-    if days > 0:
-        parts.append(f"{days}d")
-    if hours > 0:
-        parts.append(f"{hours}h")
-    if minutes > 0:
-        parts.append(f"{minutes}m")
-    if not parts or (days == 0 and hours == 0 and minutes == 0): # Show seconds if uptime is short or only seconds remain
-        parts.append(f"{seconds}s")
-    
-    return " ".join(parts) if parts else "0s"
 
 @slash_command(name="uptime", description="Shows how long Ina has been online.")
 async def uptime_command(ctx: SlashContext):
@@ -982,70 +730,6 @@ async def perk_command(ctx, perk_name: str):
     embed.set_footer(text="Perk information from local data. Values may scale with Gear Score in-game.")
     await ctx.send(embeds=embed)
 
-def _eval_perk_expression(expr_str: str, gs_multiplier_val: float) -> str:
-    """
-    Safely evaluates a perk expression string after substituting perkMultiplier.
-    Example: expr_str = "0.024 * perkMultiplier", gs_multiplier_val = 1.45 (for GS 725 from base 500)
-    """
-    try:
-        # Original expression for checks, before replacing perkMultiplier
-        original_expr_for_check = expr_str.strip()
-
-        # Replace perkMultiplier (and {perkMultiplier} if it appears with braces) with its numeric value
-        eval_str = expr_str.replace("{perkMultiplier}", str(gs_multiplier_val)) # Handle if braces are part of the expression
-        eval_str = eval_str.replace("perkMultiplier", str(gs_multiplier_val))   # Handle if no braces
-
-        result = None
-        # Check if the original expression was a simple number and did not contain "perkMultiplier"
-        # This means a placeholder like ${10} or ${2.5} is intended to be scaled by gs_multiplier_val.
-        if "perkMultiplier" not in original_expr_for_check:
-            try:
-                # Attempt to convert the original expression to a float
-                numeric_value = float(original_expr_for_check)
-                # If successful, and perkMultiplier was not in the original, scale this number
-                result = numeric_value * gs_multiplier_val
-            except ValueError:
-                # Not a simple number, proceed to eval the expression as is (e.g. if it's a string or complex expression without perkMultiplier)
-                pass # result remains None, will be handled by eval below
-
-        if result is None: # If not a simple number to be scaled, or if conversion failed
-            # Evaluate the expression string (which might have had perkMultiplier substituted)
-            allowed_globals = {"__builtins__": {}}
-            # allowed_locals could include math functions if your expressions need them, e.g., math.floor, etc.
-            # For now, it's kept simple for arithmetic.
-            allowed_locals = {}
-            result = eval(eval_str, allowed_globals, allowed_locals)
-
-        # Formatting the result
-        if isinstance(result, float):
-            if result.is_integer():
-                return str(int(result)) 
-            num_decimals = 3 if abs(result) < 1 and abs(result) > 0 else 2
-            formatted_result = f"{result:.{num_decimals}f}".rstrip('0').rstrip('.')
-            return formatted_result if formatted_result != "0" else "0" # Avoid showing just "." if result is 0.0
-        return str(result) # Fallback for non-float results (e.g., if expression was just a number)
-    except Exception as e:
-        logging.warning(f"Could not evaluate perk expression '{expr_str}' with multiplier {gs_multiplier_val}: {e}")
-        # Return the original expression part to indicate an issue or a placeholder error.
-        return f"[EVAL_ERROR: {expr_str}]"
-
-def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str:
-    """
-    Scales numeric values within a perk description string based on Gear Score.
-    Replaces placeholders like ${expression * perkMultiplier} or ${value} with their calculated/literal values.
-    """
-    if not base_value: # If base_value is None or empty, return it.
-        return base_value
-
-    base_gs = 500  # Assume base values for perkMultiplier are for GS 500
-    gs_multiplier = gear_score / base_gs
-
-    def replace_match(match):
-        expression_inside_braces = match.group(1) # Content within ${...}
-        return _eval_perk_expression(expression_inside_braces, gs_multiplier)
-
-    return re.sub(r'\{\[(.*?)\]\}', replace_match, base_value)
-
 @perk_command.autocomplete("perk_name")
 async def perk_autocomplete(ctx: AutocompleteContext): # Corrected type hint
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
@@ -1274,7 +958,7 @@ async def manage_debug(ctx: SlashContext, action: str):
     global DEBUG_MODE_ENABLED # To update the global state variable
     if not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID:
         await ctx.send("You do not have permission to use this command.", ephemeral=True)
-        return
+        return # Ensure this return is here
 
     action = action.lower()
     root_logger = logging.getLogger()
@@ -1292,52 +976,6 @@ async def manage_debug(ctx: SlashContext, action: str):
         DEBUG_MODE_ENABLED = False
         logging.info("Debug mode has been disabled via command.") # Log this at INFO before level changes fully
         await ctx.send("⚙️ Debug logging **disabled**. Console will revert to normal verbosity.", ephemeral=True)
-
-async def _cleanup_cache_files_recursive(root_dir: str) -> tuple[int, int, list[str]]:
-    """
-    Recursively cleans up __pycache__ directories and .pyc files.
-    Returns:
-        - count_pycache_dirs_removed: Number of __pycache__ directories removed.
-        - count_pyc_files_removed: Number of .pyc files removed.
-        - errors: A list of error messages encountered.
-    """
-    pycache_dirs_removed = 0
-    pyc_files_removed = 0
-    errors_encountered = []
-
-    for root, dirs, files in os.walk(root_dir, topdown=False): # topdown=False to remove subdirs first
-        # Remove .pyc files
-        for name in files:
-            if name.endswith(".pyc"):
-                file_path = os.path.join(root, name)
-                try:
-                    os.remove(file_path)
-                    pyc_files_removed += 1
-                    logging.info(f"Removed .pyc file: {file_path}")
-                except OSError as e:
-                    error_msg = f"Error removing .pyc file {file_path}: {e}"
-                    logging.error(error_msg)
-                    errors_encountered.append(error_msg)
-
-        # Remove __pycache__ directories
-        # Check if '__pycache__' is in dirs list before attempting to join path and remove
-        if "__pycache__" in dirs: # Important: Check if it's in the list of directories found by os.walk
-            dir_path = os.path.join(root, "__pycache__")
-            # Double check existence before rmtree, though os.walk found it.
-            if os.path.isdir(dir_path):
-                try:
-                    shutil.rmtree(dir_path)
-                    pycache_dirs_removed += 1
-                    logging.info(f"Removed __pycache__ directory: {dir_path}")
-                except OSError as e:
-                    error_msg = f"Error removing __pycache__ directory {dir_path}: {e}"
-                    logging.error(error_msg)
-                    errors_encountered.append(error_msg)
-            else: # Should not happen if os.walk listed it, but defensive.
-                logging.warning(f"__pycache__ reported by os.walk at {root} but not found as directory for removal: {dir_path}")
-                
-    return pycache_dirs_removed, pyc_files_removed, errors_encountered
-
 
 
 # --- Settings Commands ---
@@ -1546,20 +1184,6 @@ async def settings_logging_manager(ctx: SlashContext, action: str, channel: Opti
     else:
         # This case should ideally not be reached if choices are enforced by Discord
         await ctx.send("Invalid action specified. Please use 'enable', 'disable', or 'status'.", ephemeral=True)
-
-SILLY_MENTION_RESPONSES = [
-    "Did someone say my name? Or was it just the wind in Aeternum?",
-    "You summoned me! What grand adventure awaits? Or do you just need help with `/help`?",
-    "I sense a disturbance in the Force... oh wait, wrong universe. How can I help you in Aeternum?",
-    "Is that an Azoth staff in your pocket, or are you just happy to see me?",
-    "I was just polishing my gear! What's up?",
-    "Heard you were talking about me! Spill the corrupted beans!",
-    "Yes? I'm here, probably not AFK like some adventurers I know.",
-    "You rang? Hope it's not about another turkey invasion.",
-    "I'm listening... unless there's a rare ore node nearby. Then I'm *really* listening.",
-    "Speak, friend, and enter... my command list with `/help`!",
-    "Beep boop! Just kidding, I'm powered by Aeternum's finest Azoth. What can I do for you?",
-]
 
 # Mention handler
 @bot.event()
@@ -1804,59 +1428,6 @@ async def on_guild_role_delete(event_name: str, role: Role):
     )
     if hasattr(role, 'guild') and role.guild: # Ensure role has guild context
         await _log_server_activity(str(role.guild.id), embed)
-
-
-# --- New World funny status (RPC) rotation ---
-NW_FUNNY_STATUSES = [
-    {"name": "Terror Turkey", "state": "Being hunted... or hunting?"},
-    {"name": "Hemp for... ropes", "state": "Medicinal purposes, I swear!"},
-    {"name": "Fishing in Aeternum", "state": "Wonder if fish count as currency?"},
-    {"name": "the wilderness", "state": "Lost. Send cookies!"},
-    {"name": "with optional bosses", "state": "They weren't optional."},
-    {"name": "Tax negotiations", "state": "With the governor."},
-    {"name": "Inventory Tetris", "state": "And losing again."},
-    {"name": "Azoth management", "state": "Critically low. On foot?"},
-    {"name": "Logging", "state": "The trees know my name."},
-    {"name": "Peace mode", "state": "Just pretending to be relaxed."},
-    {"name": "Crafting madness", "state": "Art or junk?"},
-    {"name": "Expeditions", "state": "Healer has aggro. Classic."},
-    {"name": "PvP", "state": "Looking for a fight, finds the floor."},
-    {"name": "Open World PvP", "state": "'Fairplayed' by a 5-man group."},
-    {"name": "Siege Wars", "state": "Popcorn for the lag show."},
-    {"name": "Ganking 101", "state": "Plans epic, gets ganked."},
-    {"name": "PvP with 1 HP", "state": "'Strategy', not luck."},
-    {"name": "Outpost Rush", "state": "Baroness Nash > Players."},
-    {"name": "Bashing skeletons", "state": "They have a bone to pick."},
-    {"name": "Dungeon Runs", "state": "Who pulled again?!"},
-    {"name": "Elite Zones", "state": "Everything wants to eat me."},
-    {"name": "Questing", "state": "'Kill 10 boars'. Yawn."},
-    {"name": "Corruption Portals", "state": "Tentacle party!"},
-    {"name": "Hardcore Aeternum", "state": "Died to a level 5 wolf."},
-    {"name": "Hardcore Hiking", "state": "3h to Everfall. On foot."},
-    {"name": "Hardcore Loot Drop", "state": "Everything gone. Thanks, Prowler."},
-    {"name": "Hardcore with 1 Life", "state": "Trips. Game Over."},
-    {"name": "Bot-Spotting", "state": "Player or lumberjack bot?"},
-    {"name": "Resource Routes", "state": "Efficient. Or a bot."},
-    {"name": "Combat Bots", "state": "Only light attacks. Always."},
-    {"name": "GPS-guided Players", "state": "No deviation from the path."},
-    {"name": "Silent Teammates", "state": "Focused or bot?"}
-]
-
-SILLY_UPTIME_MESSAGES = [
-    "Chopping {x} Ironwood Trees for {uptime}",
-    "Farming {x} Angry Earth Mobs for {uptime}",
-    "Running {x} OPRs for {uptime}",
-    "Crafting {x} Asmodeum for {uptime}",
-    "Dodging {x} ganks on PvP Island for {uptime}",
-    "Ignoring {x} town board quests for {uptime}",
-    "Searching for {x} more Silk Threads for {uptime}",
-    "Waiting {x} minutes in queue for {uptime}", # Note: {x} here might be odd with "minutes"
-    "Polishing {x} trophies for {uptime}",
-    "Telling {x} dad jokes in global for {uptime}",
-    "Defending {x} forts for {uptime}"
-]
-
-BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8"
 
 async def rotate_funny_presence(bot, interval=60):
     await bot.wait_until_ready()
