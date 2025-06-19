@@ -66,6 +66,24 @@ if ($LASTEXITCODE -eq 0) {
     Write-Error "Python script 'create_db.py' failed with exit code: $LASTEXITCODE. Database might not be up-to-date. Aborting Git operations."
     exit 1 # Exit script if DB population fails
 }
+# --- Update VERSION file from config.py ---
+Write-Host "Attempting to update VERSION file from config.py..."
+try {
+    $configFilePath = Join-Path -Path $PSScriptRoot -ChildPath "config.py"
+    $versionFilePath = Join-Path -Path $PSScriptRoot -ChildPath "VERSION"
+
+    $configContent = Get-Content -Path $configFilePath -Raw
+    $versionMatch = $configContent | Select-String -Pattern '^__version__\s*=\s*\"(.*?)\"'
+    if ($versionMatch) {
+        $extractedVersion = $versionMatch.Matches[0].Groups[1].Value
+        Set-Content -Path $versionFilePath -Value $extractedVersion
+        Write-Host "VERSION file ($versionFilePath) updated to $extractedVersion" -ForegroundColor Green
+    } else {
+        Write-Warning "Could not extract version from $configFilePath. VERSION file not updated."
+    }
+} catch {
+    Write-Warning "Error updating VERSION file: $($_.Exception.Message). VERSION file not updated."
+}
 
 
 # Check for and remove .git/index.lock file if it exists
@@ -85,7 +103,7 @@ if (Test-Path $LockFile) {
 # Commit and push changes (ensure git is initialized in your project and you have proper permissions)
 if ($LockFileRemovedSuccessfully -or -not (Test-Path $LockFile)) {
     Write-Host "Attempting Git operations for perks_buddy.csv and new_world_data.db..."
-    git add perks_buddy.csv new_world_data.db # Add the new CSV and the DB
+  git add perks_buddy.csv new_world_data.db VERSION # Add the new CSV, the DB, and VERSION file
     if ($LASTEXITCODE -ne 0) {
         Write-Error "git add failed. Exit code: $LASTEXITCODE"
         # Decide if you want to exit here or allow script to finish
