@@ -408,15 +408,21 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
         embed.add_field(name="Armor Bonus", value=f"{armor_bonus:.1f}%", inline=True)
     if tradeskill:
         embed.add_field(name="Tradeskill", value=f"{tradeskill} ({tradeskill_bonus_pct:.1f}% bonus)", inline=True)
-    embed.add_field(name="Base Materials", value="-", inline=False)
-    for mat, qty in all_materials.items():
-        embed.add_field(name=mat.title(), value=f"{qty}", inline=True)
+
+    # Section: Base Materials
+    if all_materials:
+        embed.add_field(name="**Base Materials**", value="\u200b", inline=False)
+        for mat, qty in all_materials.items():
+            embed.add_field(name=f"🧱 {mat.title()}", value=f"{qty}", inline=True)
+
+    # Section: With Bonuses Applied
     if fort_bonus or armor_bonus or tradeskill:
         embed.add_field(name="\u200b", value="\u200b", inline=False)
-        embed.add_field(name="**With Bonuses Applied**", value="-", inline=False)
+        embed.add_field(name="**With Bonuses Applied**", value="\u200b", inline=False)
         for mat, qty in all_materials.items():
             adj_qty = max(1, int(round(qty * bonus_factor)))
-            embed.add_field(name=mat.title(), value=f"{adj_qty}", inline=True)
+            embed.add_field(name=f"✨ {mat.title()}", value=f"{adj_qty}", inline=True)
+
     embed.set_footer(text="Bonuses reduce the required materials. Minimum per material is 1.")
     await ctx.send(embeds=embed)
 
