@@ -20,6 +20,7 @@ from utils.image_utils import generate_petpet_gif
 import json
 from bs4 import BeautifulSoup
 import requests
+import shutil # Added for rmtree
 # In your main.py or a data_manager.py
 import sqlite3 # Added for DB interaction
 # import os # Already imported
@@ -125,7 +126,7 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.107" 
+__version__ = "0.2.106" 
 
 logging.basicConfig(
     level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
@@ -297,7 +298,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "manage restart": {"desc": "Shuts down the bot for manual restart.", "usage": "/manage restart", "perms": "Bot Owner/Manager", "category": "Management"},
         "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
         "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
-        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
+        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}, # Keep comma here
+        "manage cleanup": {"desc": "Cleans up cached files like __pycache__.", "usage": "/manage cleanup", "perms": "Bot Owner/Manager", "category": "Management"},
         "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
         "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}
     }
@@ -1216,6 +1218,53 @@ async def manage_restart(ctx: SlashContext):
     # or a wrapper script is needed to actually restart the bot process.
     await bot.stop()
 
+async def _cleanup_cache_files_recursive(root_dir: str) -> tuple[int, int, list[str]]:
+    """
+    Recursively cleans up __pycache__ directories and .pyc files.
+    Returns:
+        - count_pycache_dirs_removed: Number of __pycache__ directories removed.
+        - count_pyc_files_removed: Number of .pyc files removed.
+        - errors: A list of error messages encountered.
+    """
+    pycache_dirs_removed = 0
+    pyc_files_removed = 0
+    errors_encountered = []
+
+    for root, dirs, files in os.walk(root_dir, topdown=False): # topdown=False to remove subdirs first
+        # Remove .pyc files
+        for name in files:
+            if name.endswith(".pyc"):
+                file_path = os.path.join(root, name)
+                try:
+                    os.remove(file_path)
+                    pyc_files_removed += 1
+                    logging.info(f"Removed .pyc file: {file_path}")
+                except OSError as e:
+                    error_msg = f"Error removing .pyc file {file_path}: {e}"
+                    logging.error(error_msg)
+                    errors_encountered.append(error_msg)
+
+        # Remove __pycache__ directories
+        # Check if '__pycache__' is in dirs list before attempting to join path and remove
+        if "__pycache__" in dirs: # Important: Check if it's in the list of directories found by os.walk
+            dir_path = os.path.join(root, "__pycache__")
+            # Double check existence before rmtree, though os.walk found it.
+            if os.path.isdir(dir_path):
+                try:
+                    shutil.rmtree(dir_path)
+                    pycache_dirs_removed += 1
+                    logging.info(f"Removed __pycache__ directory: {dir_path}")
+                except OSError as e:
+                    error_msg = f"Error removing __pycache__ directory {dir_path}: {e}"
+                    logging.error(error_msg)
+                    errors_encountered.append(error_msg)
+            else: # Should not happen if os.walk listed it, but defensive.
+                logging.warning(f"__pycache__ reported by os.walk at {root} but not found as directory for removal: {dir_path}")
+                
+    return pycache_dirs_removed, pyc_files_removed, errors_encountered
+
+
+
 # --- Settings Commands ---
 @slash_command(name="settings", description="Manage bot settings (requires permissions).")
 async def settings(ctx: SlashContext):
@@ -1223,6 +1272,35 @@ async def settings(ctx: SlashContext):
     # This function body can be left empty or provide a generic help message
     # if called directly, though usually users will invoke subcommands.
     pass
+
+@manage_group.subcommand(
+    sub_cmd_name="cleanup",
+    sub_cmd_description="Cleans up cached Python files (__pycache__, .pyc) (Bot Owner/Manager only)."
+)
+async def manage_cleanup(ctx: SlashContext):
+    if not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID:
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+
+    await ctx.defer(ephemeral=True)
+
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    pycache_count, pyc_count, errors = await _cleanup_cache_files_recursive(project_root)
+
+    response_message = "🧹 **Cache Cleanup Report** 🧹\n"
+    response_message += f"Removed `{pycache_count}` `__pycache__` directories.\n"
+    response_message += f"Removed `{pyc_count}` `.pyc` files.\n"
+
+    if errors:
+        response_message += "\n⚠️ **Errors Encountered:**\n"
+        for error in errors[:5]: # Show up to 5 errors to keep message length reasonable
+            response_message += f"- {error}\n"
+        if len(errors) > 5:
+            response_message += f"- ...and {len(errors) - 5} more errors (check bot logs for details).\n"
+    else:
+        response_message += "\n✅ Cleanup completed successfully with no errors."
+
+    await ctx.send(response_message, ephemeral=True)
 
 @settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
