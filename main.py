@@ -406,9 +406,20 @@ async def calculate_craft_autocomplete(ctx: AutocompleteContext):
     if not search_term:
         await ctx.send(choices=[])
         return
-    from db_utils import find_item_in_db
-    items = await find_item_in_db(search_term, exact_match=False)
-    choices = [{"name": item["Name"], "value": item["Name"]} for item in items[:25]]
+    from db_utils import get_db_connection
+    conn = get_db_connection()
+    choices = []
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT Name FROM items WHERE lower(Name) LIKE ? LIMIT 25", ('%' + search_term + '%',))
+        matches = cursor.fetchall()
+        choices = [{"name": row["Name"], "value": row["Name"]} for row in matches]
+    except Exception as e:
+        import logging
+        logging.error(f"Error in calculate_craft_autocomplete: {e}")
+    finally:
+        if conn:
+            conn.close()
     await ctx.send(choices=choices)
 
 
