@@ -227,7 +227,8 @@ def calculate_crafting_materials(item_name: str, quantity: int = 1, include_inte
         else:
             recipe_cache: Dict[str, Optional[Dict[str, Any]]] = {}
             processed_for_cycle_detection: Set[str] = set()
-            return _calculate_materials_recursive(item_name, quantity, recipe_cache, processed_for_cycle_detection)
+            # Limit recursion depth to prevent OOM/crash
+            return _calculate_materials_recursive(item_name, quantity, recipe_cache, processed_for_cycle_detection, depth=0, max_depth=20)
     except Exception as e:
         logging.error(f"Error in calculate_crafting_materials for '{item_name}': {e}", exc_info=True)
         return None
