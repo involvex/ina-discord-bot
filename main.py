@@ -456,23 +456,39 @@ async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: b
         "gold ingot": "🥇",
         "silver ingot": "🥈",
     }
-    if all_materials:
-        embed.add_field(name="Materials", value="\u200b", inline=False)
-        for mat, qty in all_materials.items():
-            adj_qty = max(1, int(round(qty * bonus_factor)))
-            emoji = MATERIAL_EMOJIS.get(mat.lower(), "")
-            if fort_bonus or armor_bonus or tradeskill:
-                embed.add_field(
-                    name=f"{emoji} {mat.title()}",
-                    value=f"{qty} → **{adj_qty}**",
-                    inline=True
-                )
-            else:
-                embed.add_field(
-                    name=f"{emoji} {mat.title()}",
-                    value=f"{qty}",
-                    inline=True
-                )
+    # If no materials, show the crafted item as a base material
+    if not all_materials:
+        all_materials = {item_name: amount or 1}
+
+    embed.add_field(name="**Materials**", value="\u200b", inline=False)
+    for mat, qty in all_materials.items():
+        adj_qty = max(1, int(round(qty * bonus_factor)))
+        emoji = MATERIAL_EMOJIS.get(mat.lower(), "")
+        # Try to get icon for this material
+        icon_url = None
+        try:
+            mat_results = await find_item_in_db(mat, exact_match=True)
+            if mat_results and (mat_results[0].get("Icon") or mat_results[0].get("Icon Path")):
+                icon_url = mat_results[0].get("Icon") or mat_results[0].get("Icon Path")
+        except Exception:
+            icon_url = None
+        # Make material name a hyperlink if icon is available
+        if icon_url:
+            field_name = f"{emoji} [{mat.title()}]({icon_url})"
+        else:
+            field_name = f"{emoji} {mat.title()}".strip()
+        if fort_bonus or armor_bonus or tradeskill:
+            embed.add_field(
+                name=field_name,
+                value=f"{qty} → **{adj_qty}**",
+                inline=False
+            )
+        else:
+            embed.add_field(
+                name=field_name,
+                value=f"{qty}",
+                inline=False
+            )
     embed.set_footer(text="Bonuses reduce the required materials. Minimum per material is 1.")
     await ctx.send(embeds=embed)
 
@@ -1115,6 +1131,51 @@ async def manage_cleanup(ctx: SlashContext):
         response_message += "\n✅ Cleanup completed successfully with no errors."
 
     await ctx.send(response_message, ephemeral=True)
+
+# --- Update items from nwdb.info and upload to git ---
+import aiohttp
+async def update_items_from_nwdb():
+    items = []
+    page = 1
+    while True:
+        url = f"https://nwdb.info/db/items/page/{page}.json"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    break
+                data = await resp.json()
+                if not data or not isinstance(data, list):
+                    break
+                items.extend(data)
+                if len(data) < 100:  # Last page is usually < 100 items
+                    break
+                page += 1
+    # Save to items.json
+    with open("items.json", "w", encoding="utf-8") as f:
+        import json
+        json.dump(items, f, indent=2)
+    return len(items)
+
+@manage_group.subcommand(
+    sub_cmd_name="update_items",
+    sub_cmd_description="Scrape all items from nwdb.info and upload to git (Owner only)."
+)
+async def manage_update_items(ctx: SlashContext):
+    if ctx.author.id != OWNER_ID:
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+    await ctx.defer(ephemeral=True)
+    count = await update_items_from_nwdb()
+    # Optionally, commit and push to git
+    import subprocess
+    import os
+    try:
+        subprocess.run(["git", "add", "items.json"], check=True)
+        subprocess.run(["git", "commit", "-m", f"Update items.json ({count} items scraped from nwdb.info)"], check=True)
+        subprocess.run(["git", "push"], check=True)
+        await ctx.send(f"✅ Scraped and uploaded {count} items to items.json and pushed to git.")
+    except Exception as e:
+        await ctx.send(f"Scraped {count} items, but git commit/push failed: {e}")
 
 @settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)
