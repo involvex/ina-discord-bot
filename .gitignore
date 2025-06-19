@@ -24,5 +24,6 @@ perks.csv
 perks_scraped.csv
 new_world_world_data.db
 perks_buddy.csv
-# items.json
+items.json
+items_updated.json
 bfg.jar

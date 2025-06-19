@@ -460,18 +460,28 @@ async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: b
     if not all_materials:
         all_materials = {item_name: amount or 1}
 
+    # Load items_updated.json once and cache
+    import os
+    import json as _json
+    if not hasattr(calculate_craft, "_items_cache"):
+        items_path = os.path.join(os.path.dirname(__file__), "items_updated.json")
+        try:
+            with open(items_path, "r", encoding="utf-8") as f:
+                calculate_craft._items_cache = _json.load(f)
+        except Exception:
+            calculate_craft._items_cache = []
+    items_data = calculate_craft._items_cache
+
     embed.add_field(name="**Materials**", value="\u200b", inline=False)
     for mat, qty in all_materials.items():
         adj_qty = max(1, int(round(qty * bonus_factor)))
         emoji = MATERIAL_EMOJIS.get(mat.lower(), "")
-        # Try to get icon for this material
+        # Try to get icon for this material from items_updated.json
         icon_url = None
-        try:
-            mat_results = await find_item_in_db(mat, exact_match=True)
-            if mat_results and (mat_results[0].get("Icon") or mat_results[0].get("Icon Path")):
-                icon_url = mat_results[0].get("Icon") or mat_results[0].get("Icon Path")
-        except Exception:
-            icon_url = None
+        for item in items_data:
+            if (item.get("name", "").lower() == mat.lower()) or (item.get("Name", "").lower() == mat.lower()):
+                icon_url = item.get("icon") or item.get("icon_url") or item.get("Icon") or item.get("Icon Path")
+                break
         # Make material name a hyperlink if icon is available
         if icon_url:
             field_name = f"{emoji} [{mat.title()}]({icon_url})"
@@ -1165,15 +1175,22 @@ async def manage_update_items(ctx: SlashContext):
         await ctx.send("You do not have permission to use this command.", ephemeral=True)
         return
     await ctx.defer(ephemeral=True)
-    count = await update_items_from_nwdb()
-    # Optionally, commit and push to git
+    # Run the PowerShell script first
     import subprocess
     import os
     try:
+        script_path = os.path.join(os.path.dirname(__file__), "scrapeitems.ps1")
+        subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", script_path], check=True)
+    except Exception as e:
+        await ctx.send(f"Failed to run scrapeitems.ps1: {e}")
+        return
+    count = await update_items_from_nwdb()
+    try:
         subprocess.run(["git", "add", "items.json"], check=True)
-        subprocess.run(["git", "commit", "-m", f"Update items.json ({count} items scraped from nwdb.info)"], check=True)
+        subprocess.run(["git", "add", "items_updated.json"], check=True)
+        subprocess.run(["git", "commit", "-m", f"Update items.json/items_updated.json ({count} items scraped from nwdb.info)"], check=True)
         subprocess.run(["git", "push"], check=True)
-        await ctx.send(f"✅ Scraped and uploaded {count} items to items.json and pushed to git.")
+        await ctx.send(f"✅ Ran scrapeitems.ps1, scraped and uploaded {count} items to items.json/items_updated.json and pushed to git.")
     except Exception as e:
         await ctx.send(f"Scraped {count} items, but git commit/push failed: {e}")
 
