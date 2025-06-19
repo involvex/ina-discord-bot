@@ -457,7 +457,7 @@ async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: b
         "silver ingot": "🥈",
     }
     if all_materials:
-        embed.add_field(name="Materials", value="", inline=False)
+        embed.add_field(name="Materials", value="\u200b", inline=False)
         for mat, qty in all_materials.items():
             adj_qty = max(1, int(round(qty * bonus_factor)))
             emoji = MATERIAL_EMOJIS.get(mat.lower(), "")
