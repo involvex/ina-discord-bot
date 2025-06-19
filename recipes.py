@@ -178,16 +178,24 @@ def _calculate_materials_recursive(
     recipe_cache: Dict[str, Optional[Dict[str, Any]]], 
     processed_for_cycle_detection: Set[str],
     depth: int = 0,
-    max_depth: int = 20  # Set a reasonable max depth
+    max_depth: int = 20,  # Set a reasonable max depth
+    unique_materials: set = None,
+    max_unique_materials: int = 100
 ) -> Dict[str, int]:
+    if unique_materials is None:
+        unique_materials = set()
     if depth > max_depth:
         logging.warning(f"Max recursion depth reached for item: {item_name}. Treating as base material.")
         return {item_name: quantity_needed}
     if item_name in processed_for_cycle_detection:
         logging.warning(f"Crafting cycle detected for item: {item_name}. Treating as base material.")
         return {item_name: quantity_needed}
+    if len(unique_materials) > max_unique_materials:
+        logging.warning(f"Max unique materials reached. Stopping recursion.")
+        return {item_name: quantity_needed}
 
     processed_for_cycle_detection.add(item_name)
+    unique_materials.add(item_name)
     recipe = recipe_cache.get(item_name)
     if item_name not in recipe_cache:
         recipe = get_recipe(item_name)
@@ -195,6 +203,7 @@ def _calculate_materials_recursive(
 
     base_materials: Dict[str, int] = {}
 
+    # If no recipe, treat as base material
     if not recipe or not recipe.get("ingredients"):
         base_materials[item_name] = base_materials.get(item_name, 0) + quantity_needed
     else:
@@ -204,7 +213,7 @@ def _calculate_materials_recursive(
             sub_item_total_needed = sub_item_quantity_per_craft * quantity_needed
 
             sub_materials_for_ingredient = _calculate_materials_recursive(
-                sub_item_name, sub_item_total_needed, recipe_cache, processed_for_cycle_detection, depth + 1, max_depth
+                sub_item_name, sub_item_total_needed, recipe_cache, processed_for_cycle_detection, depth + 1, max_depth, unique_materials, max_unique_materials
             )
             for mat, qty in sub_materials_for_ingredient.items():
                 base_materials[mat] = base_materials.get(mat, 0) + qty
@@ -227,8 +236,11 @@ def calculate_crafting_materials(item_name: str, quantity: int = 1, include_inte
         else:
             recipe_cache: Dict[str, Optional[Dict[str, Any]]] = {}
             processed_for_cycle_detection: Set[str] = set()
-            # Limit recursion depth to prevent OOM/crash
-            return _calculate_materials_recursive(item_name, quantity, recipe_cache, processed_for_cycle_detection, depth=0, max_depth=20)
+            # Limit recursion depth and unique materials to prevent OOM/crash
+            return _calculate_materials_recursive(
+                item_name, quantity, recipe_cache, processed_for_cycle_detection,
+                depth=0, max_depth=20, unique_materials=set(), max_unique_materials=100
+            )
     except Exception as e:
         logging.error(f"Error in calculate_crafting_materials for '{item_name}': {e}", exc_info=True)
         return None
