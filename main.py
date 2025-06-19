@@ -364,9 +364,10 @@ async def nwdb_autocomplete(ctx: AutocompleteContext): # Corrected type hint for
 @slash_command(name="calculate_craft", description="Calculate all resources needed to craft an item, including intermediates.")
 @slash_option("item_name", "The name of the item to craft", opt_type=OptionType.STRING, required=True, autocomplete=True)
 @slash_option("amount", "How many to craft", opt_type=OptionType.INTEGER, required=False)
-@slash_option("fort_bonus", "Fort bonus % (optional)", opt_type=OptionType.NUMBER, required=False)
+@slash_option("fort_bonus", "Fort bonus (yes/no, optional)", opt_type=OptionType.BOOLEAN, required=False)
 @slash_option("armor_bonus", "Armor bonus % (2-10, optional)", opt_type=OptionType.NUMBER, required=False)
-async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: float = 0, armor_bonus: float = 0):
+@slash_option("tradeskill", "Tradeskill (1-250, optional)", opt_type=OptionType.INTEGER, required=False)
+async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool = False, armor_bonus: float = 0, tradeskill: int = 1):
     await ctx.defer() # Defer response
     recipe_details = None
     try:
@@ -389,22 +390,28 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: floa
         await ctx.send(f"Could not calculate materials for '{item_name}'. Ensure it's a craftable item with a known recipe.", ephemeral=True)
         return
     # Apply bonuses
-    fort_bonus = max(0, min(fort_bonus or 0, 100))
     armor_bonus = max(0, min(armor_bonus or 0, 10))
-    bonus_factor = (1 - (fort_bonus + armor_bonus) / 100)
+    tradeskill = max(1, min(tradeskill or 1, 250))
+    # Fort bonus: 10% if yes, 0% if no
+    fort_bonus_pct = 10 if fort_bonus else 0
+    # Tradeskill bonus: 0% at 1, 300% at 250 (linear)
+    tradeskill_bonus_pct = (tradeskill - 1) * (300 / 249) if tradeskill > 1 else 0
+    total_bonus = fort_bonus_pct + armor_bonus + tradeskill_bonus_pct
+    bonus_factor = 1 - (total_bonus / 100)
     # Prepare beautified embed
     embed = Embed()
     embed.title = f"Crafting: {item_name.title()}"
     embed.color = 0x4CAF50
     embed.add_field(name="Amount", value=str(amount or 1), inline=True)
-    if fort_bonus:
-        embed.add_field(name="Fort Bonus", value=f"{fort_bonus:.1f}%", inline=True)
+    embed.add_field(name="Fort Bonus", value="Yes" if fort_bonus else "No", inline=True)
     if armor_bonus:
         embed.add_field(name="Armor Bonus", value=f"{armor_bonus:.1f}%", inline=True)
+    if tradeskill:
+        embed.add_field(name="Tradeskill", value=f"{tradeskill} ({tradeskill_bonus_pct:.1f}% bonus)", inline=True)
     embed.add_field(name="Base Materials", value="", inline=False)
     for mat, qty in all_materials.items():
         embed.add_field(name=mat.title(), value=f"{qty}", inline=True)
-    if fort_bonus or armor_bonus:
+    if fort_bonus or armor_bonus or tradeskill:
         embed.add_field(name="\u200b", value="\u200b", inline=False)
         embed.add_field(name="**With Bonuses Applied**", value="", inline=False)
         for mat, qty in all_materials.items():

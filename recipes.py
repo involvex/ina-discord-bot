@@ -135,16 +135,23 @@ def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
             try:
                 ingredient_pairs = crafting_recipe_str.split(',')
                 for pair in ingredient_pairs:
-                    if not pair.strip(): continue
+                    if not pair.strip():
+                        continue
                     parts = pair.split(':', 1) # Split only on the first colon
                     if len(parts) == 2:
                         item_id_for_ingredient = parts[0].strip()
                         quantity_str = parts[1].strip()
-                        quantity = int(quantity_str)
+                        try:
+                            quantity = int(quantity_str)
+                        except Exception:
+                            logging.warning(f"Malformed quantity '{quantity_str}' in pair '{pair}' for '{item_name}'")
+                            continue
                         ingredient_name = _get_item_name_from_id(item_id_for_ingredient, conn)
                         parsed_ingredients.append({'item': ingredient_name, 'quantity': quantity})
                     else:
-                        logging.warning(f"Malformed ingredient pair '{pair}' in DB recipe string for '{item_name}': '{crafting_recipe_str}'")
+                        # If it's just an ID or malformed, skip it
+                        logging.warning(f"Malformed ingredient pair '{pair}' in DB recipe string for '{item_name}': '{crafting_recipe_str}' (skipped)")
+                        continue
             except ValueError as e:
                 logging.error(f"Error parsing quantity for '{item_name}' from items table: '{crafting_recipe_str}'. Error: {e}")
             except Exception as e:
@@ -154,8 +161,8 @@ def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 'output_item_name': item_row["Name"], # Use the name from the items table
                 'station': '-', # Not directly available in this context
                 'skill': 'Unknown', # Not directly available
-                'skill_level': item_row.get('Required_Tradeskill_Rank', '-'),
-                'tier': item_row.get('Tier', '-'),
+                'skill_level': item_row['Required_Tradeskill_Rank'] if 'Required_Tradeskill_Rank' in item_row.keys() else '-',
+                'tier': item_row['Tier'] if 'Tier' in item_row.keys() else '-',
                 'ingredients': parsed_ingredients
             }
         
