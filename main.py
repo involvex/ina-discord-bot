@@ -10,6 +10,8 @@ import time # For uptime tracking
 from interactions import slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role, AutocompleteContext
 from interactions.models.discord.channel import GuildText # For specific channel type checking
 from interactions.api.events.discord import MessageCreate # Import the event type
+import logging
+interactions_logger = logging.getLogger("interactions")
 from typing import Optional
 import packaging.version  # For version comparison
 import json
