@@ -24,6 +24,12 @@ def fetch_csv_data(url):
         print(f"Error fetching CSV from {url}: {e}")
         return None
 
+def cleanup_items_csv():
+    if os.path.exists(ITEMS_CSV_PATH):
+        os.remove(ITEMS_CSV_PATH)
+        print("Removed items.csv after DB population.")
+
+
 def populate_db():
     conn = sqlite3.connect(DB_NAME)
     print(f"Connecting to and populating database: {DB_NAME}")
@@ -120,3 +126,4 @@ def populate_db():
 
 if __name__ == "__main__":
     populate_db()
+    cleanup_items_csv()
