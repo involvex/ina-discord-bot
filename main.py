@@ -19,7 +19,7 @@ import datetime # For timestamps in logs
 # --- Version Configuration ---
 # Read version from VERSION file for the running instance.
 # The pre-commit hook looks for a line like: version = "x.y.z"
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 VERSION_FILE_PATH_MAIN = os.path.join(os.path.dirname(__file__), 'VERSION')
 try:
