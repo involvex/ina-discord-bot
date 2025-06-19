@@ -19,7 +19,7 @@ import datetime # For timestamps in logs
 # --- Version Configuration ---
 # Read version from VERSION file for the running instance.
 # The pre-commit hook looks for a line like: version = "x.y.z"
-__version__ = "0.0.1"  # Fallback version if VERSION file is not found or empty
+__version__ = "0.0.2"  # Fallback version if VERSION file is not found or empty
 VERSION_FILE_PATH_MAIN = os.path.join(os.path.dirname(__file__), 'VERSION')
 try:
     with open(VERSION_FILE_PATH_MAIN, 'r') as f_main_version:

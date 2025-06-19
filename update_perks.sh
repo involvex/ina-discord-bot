@@ -15,19 +15,16 @@ if [ $CREATE_DB_EXIT_CODE -ne 0 ]; then
     exit 1
 fi
 echo "Database population script (create_db.py) completed successfully."
-# Update VERSION file from config.py
-echo "Attempting to update VERSION file from config.py..."
-python3 -c "import re, os; \
-cfg_path='config.py'; v_path='VERSION'; version=None; \
-script_dir = os.path.dirname(os.path.realpath('$0')); \
-cfg_full_path=os.path.join(script_dir, cfg_path); v_full_path=os.path.join(script_dir, v_path); \
-with open(cfg_full_path, 'r') as f: content = f.read(); \
-match = re.search(r'^__version__\s*=\s*\"(.*?)\"', content, re.M); \
-if match: version = match.group(1); \
-if version: \
-  with open(v_full_path, 'w') as f: f.write(version); \
-  print(f'VERSION file ({v_full_path}) updated to {version}'); \
-else: print(f'Error: Could not extract version from {cfg_full_path}. VERSION file not updated.');"
+
+# Ensure VERSION file exists and read version
+VERSION_FILE="VERSION"
+if [ -f "$VERSION_FILE" ]; then
+    VERSION=$(cat "$VERSION_FILE")
+    echo "Current version from VERSION file: $VERSION"
+else
+    echo "Error: VERSION file not found. Please ensure it exists." >&2
+    exit 1
+fi
 
 # Check for and remove .git/index.lock file if it exists
 LOCK_FILE=".git/index.lock"
@@ -43,5 +40,5 @@ fi
 
 # Commit and push changes (ensure git is initialized in your project and you have proper permissions)
 git add perks_buddy.csv new_world_data.db VERSION && \
-git commit -m "Update perks data (automated)" && \
+git commit -m "Update perks data (automated, version $VERSION)" && \
 git push
