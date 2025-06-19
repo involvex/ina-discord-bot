@@ -4,7 +4,7 @@ import sys
 import time
 
 # --- Bot Version ---
-__version__ = "0.2.111" # Centralized version
+__version__ = "0.2.112" # Centralized version
 
 # --- Core Bot Config ---
 OWNER_ID = 157968227106947072  # Your Discord User ID

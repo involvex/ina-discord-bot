@@ -19,21 +19,20 @@ import datetime # For timestamps in logs
 # --- Version Configuration ---
 # Read version from VERSION file for the running instance.
 # The pre-commit hook looks for a line like: version = "x.y.z"
-__version__ = "0.0.11"
-
+__version__ = "0.0.1"  # Fallback version if VERSION file is not found or empty
 VERSION_FILE_PATH_MAIN = os.path.join(os.path.dirname(__file__), 'VERSION')
 try:
     with open(VERSION_FILE_PATH_MAIN, 'r') as f_main_version:
         __version__ = f_main_version.read().strip()
     if not __version__:
         logging.warning(f"VERSION file at {VERSION_FILE_PATH_MAIN} is empty. Using fallback.")
-        __version__ = "0.0.0-unknown-empty-version"
+        $10.2.90"
 except FileNotFoundError:
     logging.warning(f"VERSION file not found at {VERSION_FILE_PATH_MAIN}. Using fallback.")
-    __version__ = "0.0.0-unknown-no-version-file"
+    $10.2.90"
 except Exception as e_main_version:
     logging.warning(f"Could not read VERSION file at {VERSION_FILE_PATH_MAIN} due to {e_main_version}. Using fallback.")
-    __version__ = "0.0.0-unknown-read-error"
+    $10.2.90"
 
 version = __version__ # For pre-commit hooks or other tools scanning this file.
 
