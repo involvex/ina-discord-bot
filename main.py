@@ -1150,8 +1150,8 @@ async def update_items_from_nwdb():
                 if len(data) < 100:  # Last page is usually < 100 items
                     break
                 page += 1
-    # Save to items.json
-    with open("items.json", "w", encoding="utf-8") as f:
+    # Save to items_updated.json
+    with open("items_updated.json", "w", encoding="utf-8") as f:
         import json
         json.dump(items, f, indent=2)
     return len(items)
