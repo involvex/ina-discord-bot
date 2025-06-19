@@ -11,7 +11,7 @@ from config import DB_NAME, ITEMS_CSV_URL # Import DB_NAME and ITEMS_CSV_URL
 CSV_SOURCES = {
     "items": ITEMS_CSV_URL, # Use the imported constant
     # "perks" will be handled specially from a local file perks_buddy.csv
-    # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks_scraped.csv", # Kept for reference, but not used
+    # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot/main/perks_scraped.csv", # Kept for reference, but not used
 }
 
 def fetch_csv_data(url):
