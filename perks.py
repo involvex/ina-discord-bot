@@ -1,8 +1,7 @@
 import csv
 import os
 from typing import Dict, Optional
-
-PERKS_FILE = 'perks.csv' # Default filename
+from config import PERKS_FILE # Import PERKS_FILE
 
 def load_perks_from_csv(csv_filepath: str = PERKS_FILE) -> Dict[str, Dict[str, str]]:
     """Loads perk data from a CSV file into a dictionary.
@@ -77,4 +76,3 @@ if __name__ == '__main__':
                 break
     else:
         print(f"Failed to load perks from '{PERKS_FILE}'.")
-

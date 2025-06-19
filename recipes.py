@@ -8,9 +8,7 @@ import json
 import logging
 import sqlite3
 from typing import Optional, Dict, Any, Set
-
-TRACKED_RECIPES_FILE = 'tracked_recipes.json'
-DB_NAME = "new_world_data.db" # Assuming this is your database name
+from config import DB_NAME, TRACKED_RECIPES_FILE # Import DB_NAME and TRACKED_RECIPES_FILE
 
 logging.basicConfig(level=logging.INFO) # Ensure logging is configured
 

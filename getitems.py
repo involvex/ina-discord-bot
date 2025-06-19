@@ -6,11 +6,10 @@ from typing import Dict, Optional
 import requests # For fetching from URL
 import io # For reading string as file
 
+from config import ITEMS_CSV_URL # Import ITEMS_CSV_URL
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-ITEMS_CSV_URL = "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv"
 
 def get_item_database() -> Dict[str, Dict[str, str]]:
     """

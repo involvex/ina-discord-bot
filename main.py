@@ -18,7 +18,7 @@ import sqlite3 # Added for DB interaction
 import datetime # For timestamps in logs
 
 from bot_client import bot # Import the bot instance 
-__version__ = "0.2.11"
+__version__ = "0.2.12"
 from config import (
     __version__ as config_version, # Import with an alias
     BOT_START_TIME, DEFAULT_LOG_LEVEL, DEBUG_MODE_ENABLED,

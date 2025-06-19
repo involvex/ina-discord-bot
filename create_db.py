@@ -5,13 +5,11 @@ import os
 import requests
 from io import StringIO
 import json # For serializing ingredients
- # The RECIPES dictionary is no longer imported from recipes.py as it's not defined there.
+from config import DB_NAME, ITEMS_CSV_URL # Import DB_NAME and ITEMS_CSV_URL
 # The recipes table will be created, but populated by other means or remain available for future population.
-
-DB_NAME = "new_world_data.db"
 # Define your CSV sources
 CSV_SOURCES = {
-    "items": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/items.csv", # Assuming items.csv remains remote
+    "items": ITEMS_CSV_URL, # Use the imported constant
     # "perks" will be handled specially from a local file perks_buddy.csv
     # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot-/main/perks_scraped.csv", # Kept for reference, but not used
 }
