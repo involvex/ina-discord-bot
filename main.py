@@ -16,9 +16,8 @@ import json
 import requests
 import sqlite3 # Added for DB interaction
 import datetime # For timestamps in logs
-
+__version__ = "0.2.110"
 from bot_client import bot # Import the bot instance 
-__version__ = "0.2.14"
 from config import (
     __version__ as config_version, # Import with an alias
     BOT_START_TIME, DEFAULT_LOG_LEVEL, DEBUG_MODE_ENABLED,
@@ -27,7 +26,7 @@ from config import (
     NEW_WORLD_WELCOME_MESSAGES, NW_FUNNY_STATUSES, SILLY_UPTIME_MESSAGES, BOT_INVITE_URL, SILLY_MENTION_RESPONSES,
     setup_logging
 )
-__version__ = config_version # Make it available in main.py for scripts that expect it here
+# __version__ is now directly from config_version where needed.
 from common_utils import format_uptime, scale_value_with_gs, _cleanup_cache_files_recursive # Renamed import
 from settings_manager import (
     save_welcome_setting, get_welcome_setting,
@@ -768,7 +767,7 @@ async def about_command(ctx):
     )
     embed.add_field(
         name="Version",
-        value=f"`{__version__}`",
+        value=f"`{config_version}`", # Use imported config_version
         inline=True
     )
     embed.add_field(
@@ -1461,7 +1460,7 @@ async def rotate_funny_presence(bot, interval=60):
 async def check_for_updates():
     """Periodically checks GitHub for new bot releases and logs a notification if found."""
     await bot.wait_until_ready()
-    logging.info(f"Ina's New World Bot version: {__version__} starting update checks.")
+    logging.info(f"Ina's New World Bot version: {config_version} starting update checks.") # Use imported config_version
     while True:
         try:
             headers = {
@@ -1479,7 +1478,7 @@ async def check_for_updates():
                 update_source_url = f"https://github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/tree/main"
 
                 if latest_version_str:
-                    current_v = packaging.version.parse(__version__)
+                    current_v = packaging.version.parse(config_version) # Use imported config_version
                     latest_v = packaging.version.parse(latest_version_str)
 
                     logging.debug(f"Update Check: Current bot version: {current_v}, Latest version on main branch: {latest_v}")
