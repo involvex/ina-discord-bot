@@ -8,9 +8,10 @@ import math
 import subprocess
 import platform # For OS detection
 import re
+import time # For uptime tracking
 # import items # No longer needed for direct data loading
 # import perks # No longer needed for direct data loading
-from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role
+from interactions import Client, slash_command, slash_option, OptionType, Permissions, Embed, Activity, ActivityType, User, SlashContext, File, Member, ChannelType, Message, Role, AutocompleteContext
 from interactions.models.discord.channel import GuildText # For specific channel type checking
 from interactions.api.events.discord import MessageCreate # Import the event type
 from typing import Optional
@@ -126,7 +127,8 @@ from dotenv import load_dotenv
 import datetime # For timestamps in logs
 load_dotenv()
 
-__version__ = "0.2.107" 
+__version__ = "0.2.108" 
+BOT_START_TIME = time.time() # Record bot start time
 
 # --- Logging Configuration ---
 DEFAULT_LOG_LEVEL = logging.INFO
@@ -291,6 +293,7 @@ async def help_command(ctx, command: Optional[str] = None):
         "help": {"desc": "Show available commands or help for a specific command.", "usage": "/help [command_name]", "category": "General"},
         "petpet": {"desc": "Give a New World petting ritual to a user!", "usage": "/petpet <user>", "category": "General"},
         "calculate": {"desc": "Perform a calculation with New World magic!", "usage": "/calculate <expression>", "category": "General"},
+        "uptime": {"desc": "Show how long Ina has been adventuring online.", "usage": "/uptime", "category": "General"},
         "about": {"desc": "Show information about Ina's New World Bot.", "usage": "/about", "category": "General"},
         "nwdb": {"desc": "Look up items from New World Database.", "usage": "/nwdb <item_name>", "category": "New World"},
         "perk": {"desc": "Look up information about a specific New World perk.", "usage": "/perk <perk_name>", "category": "New World"},
@@ -418,6 +421,33 @@ async def calculate(ctx, expression: str):
     except Exception as e:
         await ctx.send(f"The arcane calculation failed: {e}", ephemeral=True)
 
+def format_uptime(seconds: float) -> str:
+    """Formats a duration in seconds into a human-readable string (Xd Yh Zm Ws)."""
+    days = int(seconds // (24 * 3600))
+    seconds %= (24 * 3600)
+    hours = int(seconds // 3600)
+    seconds %= 3600
+    minutes = int(seconds // 60)
+    seconds = int(seconds % 60)
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    if not parts or (days == 0 and hours == 0 and minutes == 0): # Show seconds if uptime is short or only seconds remain
+        parts.append(f"{seconds}s")
+    
+    return " ".join(parts) if parts else "0s"
+
+@slash_command(name="uptime", description="Shows how long Ina has been online.")
+async def uptime_command(ctx: SlashContext):
+    current_time = time.time()
+    uptime_seconds = current_time - BOT_START_TIME
+    human_readable_uptime = format_uptime(uptime_seconds)
+    await ctx.send(f"🧭 Ina has been adventuring in Aeternum for: **{human_readable_uptime}**")
 
 @slash_command(name="nwdb", description="Look up items from New World Database.")
 @slash_option("item_name", "The name of the item to look up", opt_type=OptionType.STRING, required=True, autocomplete=True)
@@ -555,7 +585,7 @@ async def nwdb(ctx, item_name: str):
 
 
 @nwdb.autocomplete("item_name")
-async def nwdb_autocomplete(ctx: SlashContext): # Added type hint for ctx
+async def nwdb_autocomplete(ctx: AutocompleteContext): # Corrected type hint for Autocomplete
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     if not search_term: # If search term is empty, send no choices
         await ctx.send(choices=[])
@@ -618,7 +648,7 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1):
 
 
 @calculate_craft.autocomplete("item_name")
-async def calculate_craft_autocomplete(ctx: SlashContext): # Added type hint
+async def calculate_craft_autocomplete(ctx: AutocompleteContext): # Corrected type hint
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
 
     if not search_term:
@@ -703,7 +733,7 @@ async def recipe(ctx, item_name: str):
 
 
 @recipe.autocomplete("item_name")
-async def recipe_autocomplete(ctx: SlashContext): # Added type hint
+async def recipe_autocomplete(ctx: AutocompleteContext): # Corrected type hint
     # This can reuse the logic from calculate_craft_autocomplete as both search craftable items
     await calculate_craft_autocomplete(ctx)
 
@@ -826,7 +856,7 @@ async def build_remove(ctx: SlashContext, name: str):
         await ctx.send("An error occurred while trying to remove the build.", ephemeral=True)
 
 @build_remove.autocomplete("name")
-async def build_remove_autocomplete(ctx: SlashContext):
+async def build_remove_autocomplete(ctx: AutocompleteContext): # Corrected type hint
     try:
         with open(BUILDS_FILE, 'r', encoding='utf-8') as f:
             builds_data = json.load(f)
@@ -1017,7 +1047,7 @@ def scale_value_with_gs(base_value: Optional[str], gear_score: int = 725) -> str
     return re.sub(r'\{\[(.*?)\]\}', replace_match, base_value)
 
 @perk_command.autocomplete("perk_name")
-async def perk_autocomplete(ctx: SlashContext): # Added type hint
+async def perk_autocomplete(ctx: AutocompleteContext): # Corrected type hint
     search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
     if not search_term:
         await ctx.send(choices=[])
@@ -1812,6 +1842,20 @@ NW_FUNNY_STATUSES = [
     {"name": "Silent Teammates", "state": "Focused or bot?"}
 ]
 
+SILLY_UPTIME_MESSAGES = [
+    "Chopping {x} Ironwood Trees for {uptime}",
+    "Farming {x} Angry Earth Mobs for {uptime}",
+    "Running {x} OPRs for {uptime}",
+    "Crafting {x} Asmodeum for {uptime}",
+    "Dodging {x} ganks on PvP Island for {uptime}",
+    "Ignoring {x} town board quests for {uptime}",
+    "Searching for {x} more Silk Threads for {uptime}",
+    "Waiting {x} minutes in queue for {uptime}", # Note: {x} here might be odd with "minutes"
+    "Polishing {x} trophies for {uptime}",
+    "Telling {x} dad jokes in global for {uptime}",
+    "Defending {x} forts for {uptime}"
+]
+
 BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8"
 
 async def rotate_funny_presence(bot, interval=60):
@@ -1819,6 +1863,17 @@ async def rotate_funny_presence(bot, interval=60):
     while True:
         status = random.choice(NW_FUNNY_STATUSES)
         funny_status = f"{status['name']} – {status['state']}"
+
+        # Calculate current uptime
+        current_time_now = time.time()
+        uptime_seconds = current_time_now - BOT_START_TIME
+        formatted_uptime_str = format_uptime(uptime_seconds)
+
+        # Choose a silly uptime message
+        silly_template = random.choice(SILLY_UPTIME_MESSAGES)
+        random_x = random.randint(5, 500) # Adjust range as needed
+        activity_name_with_uptime = silly_template.format(x=random_x, uptime=formatted_uptime_str)
+
         activity_buttons = [
             {
                 "label": "Add Ina's Bot to your Server",
@@ -1826,7 +1881,7 @@ async def rotate_funny_presence(bot, interval=60):
             }
         ]
         try:
-            await bot.change_presence(activity=Activity(name=funny_status, type=ActivityType.GAME, buttons=activity_buttons))
+            await bot.change_presence(activity=Activity(name=activity_name_with_uptime, type=ActivityType.PLAYING, buttons=activity_buttons))
         except Exception as e:
             logging.warning(f"Failed to set presence: {e}")
         await asyncio.sleep(interval)
