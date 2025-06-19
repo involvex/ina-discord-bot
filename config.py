@@ -4,7 +4,14 @@ import sys
 import time
 
 # --- Bot Version ---
-__version__ = "0.2.112" # Centralized version
+VERSION_FILE_PATH = os.path.join(os.path.dirname(__file__), 'VERSION')
+try:
+    with open(VERSION_FILE_PATH, 'r') as f:
+        __version__ = f.read().strip()
+    if not __version__:
+        __version__ = "0.0.0"
+except Exception:
+    __version__ = "0.0.0"
 
 # --- Core Bot Config ---
 OWNER_ID = 157968227106947072  # Your Discord User ID

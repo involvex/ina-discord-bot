@@ -45,13 +45,7 @@ if (Test-Path $versionFilePath) {
     Set-Content -Path $versionFilePath -Value $version
 }
 
-# --- Optionally sync version to main.py or config.py ---
-# Example for main.py:
-$mainPyPath = Join-Path -Path $PSScriptRoot -ChildPath "main.py"
-if (Test-Path $mainPyPath) {
-    (Get-Content $mainPyPath) -replace '(__version__\s*=\s*")[^"]*(")', "`$1$version`$2" | Set-Content $mainPyPath
-    Write-Host "Synced version to main.py: $version"
-}
+# --- No need to sync version to main.py or config.py; all code reads from VERSION file ---
 
 # --- Git operations ---
 $LockFile = ".git/index.lock"
