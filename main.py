@@ -18,6 +18,7 @@ import sqlite3 # Added for DB interaction
 import datetime # For timestamps in logs
 # --- Version Configuration ---
 # Version is now always sourced from config.py (__version__)
+from config import __version__ as config_version
 version = config_version # For pre-commit hooks or other tools scanning this file.
 
 from bot_client import bot # Import the bot instance 

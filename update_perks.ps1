@@ -53,7 +53,7 @@ if (Test-Path $LockFile) {
     Write-Host "Removing .git/index.lock..."
     Remove-Item $LockFile -Force -ErrorAction SilentlyContinue
 }
-
+git add VERSION
 git add perks_buddy.csv new_world_data.db VERSION
 if ($LASTEXITCODE -eq 0) {
     $gitStatus = git status --porcelain perks_buddy.csv new_world_data.db
