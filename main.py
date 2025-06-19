@@ -128,12 +128,17 @@ load_dotenv()
 
 __version__ = "0.2.106" 
 
+# --- Logging Configuration ---
+DEFAULT_LOG_LEVEL = logging.INFO
+DEBUG_MODE_ENABLED = False # Tracks if debug mode is active
+
 logging.basicConfig(
-    level=logging.DEBUG, # Temporarily change to DEBUG to see more detailed update check logs
+    level=DEFAULT_LOG_LEVEL, 
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logging.getLogger("interactions").setLevel(logging.DEBUG)
-
+# Set interactions.py library logger level
+interactions_logger = logging.getLogger("interactions")
+interactions_logger.setLevel(DEFAULT_LOG_LEVEL)
 bot_token = os.getenv("BOT_TOKEN")
 if not bot_token:
     print("Error: BOT_TOKEN not found in .env file. Please make sure it is set.")
@@ -298,7 +303,8 @@ async def help_command(ctx, command: Optional[str] = None):
         "manage restart": {"desc": "Shuts down the bot for manual restart.", "usage": "/manage restart", "perms": "Bot Owner/Manager", "category": "Management"},
         "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
         "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
-        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}, # Keep comma here
+        "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
+        "manage debug": {"desc": "Enable or disable debug logging in the console.", "usage": "/manage debug <enable|disable>", "perms": "Bot Owner/Manager", "category": "Management"},
         "manage cleanup": {"desc": "Cleans up cached files like __pycache__.", "usage": "/manage cleanup", "perms": "Bot Owner/Manager", "category": "Management"},
         "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
         "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}
@@ -1217,6 +1223,43 @@ async def manage_restart(ctx: SlashContext):
     # Note: This stops the Python script. An external process manager (systemd, PM2, Docker, etc.)
     # or a wrapper script is needed to actually restart the bot process.
     await bot.stop()
+
+@manage_group.subcommand(
+    sub_cmd_name="debug",
+    sub_cmd_description="Enable or disable debug logging in the console (Bot Owner/Manager only)."
+)
+@slash_option(
+    name="action",
+    description="Choose to enable or disable debug logging.",
+    opt_type=OptionType.STRING,
+    required=True,
+    choices=[
+        {"name": "Enable Debug Logging", "value": "enable"},
+        {"name": "Disable Debug Logging", "value": "disable"},
+    ]
+)
+async def manage_debug(ctx: SlashContext, action: str):
+    global DEBUG_MODE_ENABLED # To update the global state variable
+    if not is_bot_manager(int(ctx.author.id)) and ctx.author.id != OWNER_ID:
+        await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        return
+
+    action = action.lower()
+    root_logger = logging.getLogger()
+    # interactions_logger is already defined globally
+
+    if action == "enable":
+        root_logger.setLevel(logging.DEBUG)
+        interactions_logger.setLevel(logging.DEBUG)
+        DEBUG_MODE_ENABLED = True
+        await ctx.send("⚙️ Debug logging **enabled**. Console will now show verbose logs.", ephemeral=True)
+        logging.debug("Debug mode has been enabled via command.")
+    elif action == "disable":
+        root_logger.setLevel(DEFAULT_LOG_LEVEL) # Revert to default (e.g., INFO)
+        interactions_logger.setLevel(DEFAULT_LOG_LEVEL)
+        DEBUG_MODE_ENABLED = False
+        logging.info("Debug mode has been disabled via command.") # Log this at INFO before level changes fully
+        await ctx.send("⚙️ Debug logging **disabled**. Console will revert to normal verbosity.", ephemeral=True)
 
 async def _cleanup_cache_files_recursive(root_dir: str) -> tuple[int, int, list[str]]:
     """
