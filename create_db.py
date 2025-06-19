@@ -6,6 +6,8 @@ import requests
 from io import StringIO
 import json # For serializing ingredients
 from config import DB_NAME, ITEMS_CSV_URL # Import DB_NAME and ITEMS_CSV_URL
+
+ITEMS_CSV_PATH = "items.csv"
 # The recipes table will be created, but populated by other means or remain available for future population.
 # Define your CSV sources
 CSV_SOURCES = {
@@ -19,6 +21,9 @@ def fetch_csv_data(url):
     try:
         response = requests.get(url)
         response.raise_for_status()  # Raise an exception for HTTP errors
+        # Save to disk for possible debugging, but will be deleted after DB population
+        with open(ITEMS_CSV_PATH, "w", encoding="utf-8") as f:
+            f.write(response.text)
         return response.text
     except requests.RequestException as e:
         print(f"Error fetching CSV from {url}: {e}")
