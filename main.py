@@ -1265,6 +1265,12 @@ async def settings_logging_manager(ctx: SlashContext, action: str, channel: Opti
         # This case should ideally not be reached if choices are enforced by Discord
         await ctx.send("Invalid action specified. Please use 'enable', 'disable', or 'status'.", ephemeral=True)
 
+# Start background update check after bot is ready
+@bot.event()
+async def on_ready():
+    import asyncio
+    asyncio.create_task(check_for_updates())
+
 # Mention handler
 @bot.event()
 async def on_message_create(event: MessageCreate): # Parameter is the event object
