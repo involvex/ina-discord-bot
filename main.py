@@ -409,20 +409,49 @@ async def calculate_craft(ctx, item_name: str, amount: int = 1, fort_bonus: bool
     if tradeskill:
         embed.add_field(name="Tradeskill", value=f"{tradeskill} ({tradeskill_bonus_pct:.1f}% bonus)", inline=True)
 
-    # Section: Base Materials
-    if all_materials:
-        embed.add_field(name="**Base Materials**", value="\u200b", inline=False)
-        for mat, qty in all_materials.items():
-            embed.add_field(name=f"🧱 {mat.title()}", value=f"{qty}", inline=True)
+    # Set embed thumbnail to the crafted item's icon (if available)
+    crafted_item_icon = None
+    try:
+        item_results = await find_item_in_db(item_name, exact_match=True)
+        if item_results and (item_results[0].get("Icon") or item_results[0].get("Icon Path")):
+            crafted_item_icon = item_results[0].get("Icon") or item_results[0].get("Icon Path")
+    except Exception:
+        crafted_item_icon = None
+    if crafted_item_icon:
+        embed.set_thumbnail(url=crafted_item_icon)
 
-    # Section: With Bonuses Applied
-    if fort_bonus or armor_bonus or tradeskill:
-        embed.add_field(name="\u200b", value="\u200b", inline=False)
-        embed.add_field(name="**With Bonuses Applied**", value="\u200b", inline=False)
+    # Emoji map for common materials
+    MATERIAL_EMOJIS = {
+        "prismatic leather": "🟣",
+        "iron ingot": "⛓️",
+        "leather": "🟤",
+        "wood": "🪵",
+        "fiber": "🧵",
+        "cloth": "🧶",
+        "stone": "🪨",
+        "gold ingot": "🥇",
+        "silver ingot": "🥈",
+        # Add more as desired
+    }
+
+    # Section: Materials (beautified, single field per material)
+    if all_materials:
+        embed.add_field(name="Materials", value="", inline=False)
         for mat, qty in all_materials.items():
             adj_qty = max(1, int(round(qty * bonus_factor)))
-            embed.add_field(name=f"✨ {mat.title()}", value=f"{adj_qty}", inline=True)
-
+            emoji = MATERIAL_EMOJIS.get(mat.lower(), "")
+            if fort_bonus or armor_bonus or tradeskill:
+                embed.add_field(
+                    name=f"{emoji} {mat.title()}",
+                    value=f"{qty} → **{adj_qty}**",
+                    inline=True
+                )
+            else:
+                embed.add_field(
+                    name=f"{emoji} {mat.title()}",
+                    value=f"{qty}",
+                    inline=True
+                )
     embed.set_footer(text="Bonuses reduce the required materials. Minimum per material is 1.")
     await ctx.send(embeds=embed)
 
