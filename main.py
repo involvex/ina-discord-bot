@@ -995,9 +995,25 @@ async def manage_cleanup(ctx: SlashContext):
     project_root = os.path.dirname(os.path.abspath(__file__))
     pycache_count, pyc_count, errors = await _cleanup_cache_files_recursive(project_root)
 
+    # Remove large or unnecessary data files
+    files_to_remove = [
+        "items.csv", "perks.csv", "perks_scraped.csv", "perks_buddy.csv", "items.json", "new_world_world_data.db"
+    ]
+    removed_files = []
+    for filename in files_to_remove:
+        file_path = os.path.join(project_root, filename)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                removed_files.append(filename)
+            except Exception as e:
+                errors.append(f"Failed to remove {filename}: {e}")
+
     response_message = "🧹 **Cache Cleanup Report** 🧹\n"
     response_message += f"Removed `{pycache_count}` `__pycache__` directories.\n"
     response_message += f"Removed `{pyc_count}` `.pyc` files.\n"
+    if removed_files:
+        response_message += f"Removed data files: {', '.join(removed_files)}\n"
 
     if errors:
         response_message += "\n⚠️ **Errors Encountered:**\n"
