@@ -1,254 +1,99 @@
 {
   "157968227106947072": [
     {
-      "item_name": "iron ingot",
+      "item_name": "Iron Ingot",
       "recipe": {
-        "station": "Smelter",
-        "skill": "Smelting",
-        "skill_level": 0,
-        "tier": 2,
+        "output_item_name": "Iron Ingot",
         "ingredients": [
           {
-            "item": "Iron Ore",
+            "item": "OreT1",
+            "qty": 4
+          }
+        ]
+      }
+    },
+    {
+      "item_name": "Iron Ingot",
+      "recipe": {
+        "output_item_name": "Iron Ingot",
+        "ingredients": [
+          {
+            "item": "OreT1",
             "quantity": 4
           }
         ]
       }
     },
     {
-      "item_name": "gorgonite amulet",
+      "item_name": "Schematic: Gorgonite Amulet",
       "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
+        "output_item_name": "Schematic: Gorgonite Amulet",
         "ingredients": [
           {
-            "item": "Gorgon's Eye",
+            "item": "TrinketChainT52",
             "quantity": 1
           },
           {
-            "item": "Prismatic Chain",
+            "item": "TrinketSettingT52",
             "quantity": 1
           },
           {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
+            "item": "MetalT52",
             "quantity": 6
+          },
+          {
+            "item": "HercyneRaidMaterial",
+            "quantity": 1
           }
         ]
       }
     },
     {
-      "item_name": "iron ingot",
+      "item_name": "Prismatic Scarab",
       "recipe": {
-        "station": "Smelter",
-        "skill": "Smelting",
-        "skill_level": 0,
-        "tier": 2,
+        "output_item_name": "Prismatic Scarab",
         "ingredients": [
           {
-            "item": "Iron Ore",
+            "item": "BlockT53",
+            "quantity": 1
+          },
+          {
+            "item": "GoldenScarab",
+            "quantity": 10
+          },
+          {
+            "item": "SolventT5",
+            "quantity": 50
+          },
+          {
+            "item": "Azoth_Currency",
+            "quantity": 500
+          }
+        ]
+      }
+    },
+    {
+      "item_name": "Schematic: Gorgonite Longsword",
+      "recipe": {
+        "output_item_name": "Schematic: Gorgonite Longsword",
+        "ingredients": [
+          {
+            "item": "MetalT52",
+            "quantity": 15
+          },
+          {
+            "item": "Timber",
             "quantity": 4
+          },
+          {
+            "item": "Leather",
+            "quantity": 2
+          },
+          {
+            "item": "HercyneRaidMaterial",
+            "quantity": 1
           }
         ]
-      }
-    },
-    {
-      "item_name": "gorgonite amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "gorgon's amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "gorgonite amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "gorgonite amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "gorgonite amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "iron ingot",
-      "recipe": {
-        "station": "Smelter",
-        "skill": "Smelting",
-        "skill_level": 0,
-        "tier": 2,
-        "ingredients": [
-          {
-            "item": "Iron Ore",
-            "quantity": 4
-          }
-        ]
-      }
-    },
-    {
-      "item_name": "iron ingot",
-      "recipe": {
-        "station": "Smelter",
-        "skill": "Smelting",
-        "skill_level": 0,
-        "tier": 2,
-        "ingredients": [
-          {
-            "item": "Iron Ore",
-            "quantity": 4
-          }
-        ],
-        "output_item_name": "iron ingot"
-      }
-    },
-    {
-      "item_name": "gorgonite amulet",
-      "recipe": {
-        "station": "Outfitting Station",
-        "skill": "Jewelcrafting",
-        "skill_level": 250,
-        "tier": 5,
-        "ingredients": [
-          {
-            "item": "Gorgon's Eye",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Chain",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Setting",
-            "quantity": 1
-          },
-          {
-            "item": "Prismatic Ingot",
-            "quantity": 6
-          }
-        ],
-        "output_item_name": "gorgonite amulet"
       }
     }
   ]

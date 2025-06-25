@@ -61,6 +61,9 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "Changes detected. Committing..."
         git commit -m "Update perks data (automated, version $version)"
         if ($LASTEXITCODE -eq 0) {
+            # Display the remote URL before pushing for verification
+            $remoteUrl = git config --get remote.origin.url
+            Write-Host "Pushing changes to remote: $remoteUrl" -ForegroundColor Yellow
             Write-Host "Pushing changes..."
             git push
             if ($LASTEXITCODE -eq 0) {
