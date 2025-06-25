@@ -8,7 +8,7 @@ from interactions import (
 
 from db_utils import find_perk_in_db
 from common_utils import scale_value_with_gs
-from commands.new_world.utils import get_any, PERK_PRETTY
+from commands.new_world.utils import get_any, PERK_PRETTY # Import get_any and PERK_PRETTY
 
 logger = logging.getLogger(__name__)
 

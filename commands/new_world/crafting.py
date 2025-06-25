@@ -10,7 +10,7 @@ from interactions import (
 ) # Added Button, ButtonStyle, component_callback, ComponentContext
 
 from db_utils import find_item_in_db
-from recipes import get_recipe, calculate_crafting_materials, track_recipe
+from recipes import get_recipe, calculate_crafting_materials, track_recipe # Removed unnecessary comment
 from commands.new_world.utils import get_any, items_data_cache, GENERIC_MATERIAL_MAPPING, resolve_item_name_for_lookup
 
 logger = logging.getLogger(__name__)
