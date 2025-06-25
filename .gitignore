@@ -19,15 +19,15 @@ __pycache__
 /TestResults.xml
 /.coverage
 .mypy_cache/
-perks.csv
-perks_scraped.csv
-# new_world_world_data.db  <- Removed, as it's intended to be committed by update_perks.sh
-# perks_buddy.csv    <- Removed, as it's intended to be committed by update_perks.sh
+# perks.csv is now tracked by git
+# perks_scraped.csv is now tracked by git
+# new_world_data.db is now tracked by git
+# perks_buddy.csv is now tracked by git
 items.json
 items_updated.json
 bfg.jar
 items.csv
-craftingsrecipe.csv # Corrected typo
+craftingsrecipe.csv
 import csv.txt
 main notused.py
 main_old.py

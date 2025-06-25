@@ -88,7 +88,7 @@ async def find_perk_in_db(perk_name_query: str, exact_match: bool = False, _atte
 
         if script_to_run and os.path.exists(script_to_run):
             try:
-                logging.info(f"Executing update script: {run_command}")
+            logging.info(f"Executing update script: {run_command}")
                 process = await asyncio.create_subprocess_exec(
                     *run_command,
                     stdout=asyncio.subprocess.PIPE,
