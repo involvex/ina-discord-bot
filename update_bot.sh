@@ -118,8 +118,8 @@ python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Install/update dependencies
 if [ -f "requirements.txt" ]; then
-  echo "INFO: Installing/updating dependencies from requirements.txt (using cache to reduce memory usage)..."
-  python3 -m pip install -U -r requirements.txt
+  echo "INFO: Installing/updating dependencies from requirements.txt..."
+  python3 -m pip install --no-cache-dir -U -r requirements.txt
   echo "INFO: Dependencies installed/updated successfully."
 else
   echo "WARNING: requirements.txt not found. Skipping dependency installation." >&2
