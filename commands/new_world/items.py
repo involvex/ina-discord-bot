@@ -14,7 +14,7 @@ from interactions import (
 from db_utils import find_item_in_db, find_perk_in_db
 from common_utils import scale_value_with_gs
 
-from commands.new_world.utils import get_any # Import the unified get_any
+from commands.new_world.utils import get_any
 logger = logging.getLogger(__name__)
 
 class NewWorldItemCommands(Extension):
