@@ -484,21 +484,30 @@ async def calculate_craft(ctx, item_name: str, amount: int = None, fort_bonus: b
             if (item.get("name", "").lower() == mat.lower()) or (item.get("Name", "").lower() == mat.lower()):
                 icon_url = item.get("icon") or item.get("icon_url") or item.get("Icon") or item.get("Icon Path")
                 break
-        # Make material name a hyperlink if icon is available
+
+        # The name field of an embed field does not support markdown links.
+        # Keep the material name clean in the name field.
+        field_name = f"{emoji} {mat.title()}".strip()
+
+        # Construct the value string, making the quantity clickable if an icon_url is available.
+        # This allows the link to be rendered correctly by Discord.
+        quantity_display = f"{qty} → **{adj_qty}**" if (fort_bonus or armor_bonus or tradeskill) else str(qty)
+
         if icon_url:
-            field_name = f"{emoji} [{mat.title()}]({icon_url})"
+            field_value = f"[{quantity_display}]({icon_url})"
         else:
-            field_name = f"{emoji} {mat.title()}".strip()
+            field_value = quantity_display
+
         if fort_bonus or armor_bonus or tradeskill:
             embed.add_field(
                 name=field_name,
-                value=f"{qty} → **{adj_qty}**",
+                value=field_value,
                 inline=False
             )
         else:
             embed.add_field(
                 name=field_name,
-                value=f"{qty}",
+                value=field_value,
                 inline=False
             )
     embed.set_footer(text="Bonuses reduce the required materials. Minimum per material is 1.")
@@ -1147,26 +1156,48 @@ async def manage_cleanup(ctx: SlashContext):
 # --- Update items from nwdb.info and upload to git ---
 import aiohttp
 async def update_items_from_nwdb():
-    items = []
+    """Scrapes all item pages from nwdb.info and saves them to items_updated.json."""
+    all_items = []
     page = 1
-    while True:
-        url = f"https://nwdb.info/db/items/page/{page}.json"
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    break
-                data = await resp.json()
-                if not data or not isinstance(data, list):
-                    break
-                items.extend(data)
-                if len(data) < 100:  # Last page is usually < 100 items
-                    break
-                page += 1
+    page_count = 1  # Start with 1, will be updated on the first successful fetch
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    }
+
+    async with aiohttp.ClientSession(headers=headers) as session:
+        while page <= page_count:
+            url = f"https://nwdb.info/db/items/page/{page}.json"
+            logging.info(f"Scraping item page: {url}")
+            try:
+                async with session.get(url, timeout=20) as resp:
+                    if resp.status != 200:
+                        body = await resp.text()
+                        logging.error(f"Failed to fetch item page {page}, status: {resp.status}. Body: {body[:200]}")
+                        break
+
+                    # Use content_type=None to ignore content type header, which can be wrong if behind a proxy/CDN
+                    data = await resp.json(content_type=None)
+
+                    if not data.get('success') or not isinstance(data.get('data'), list):
+                        logging.warning(f"Response from {url} was not successful or did not contain a data list.")
+                        break
+
+                    if page == 1 and data.get('pageCount'):
+                        page_count = data['pageCount']
+                        logging.info(f"Total item pages to scrape: {page_count}")
+
+                    all_items.extend(data['data'])
+                    page += 1
+                    await asyncio.sleep(0.5)  # Be respectful to the server
+            except Exception as e:
+                logging.error(f"An unexpected error occurred during page {page} scrape: {e}", exc_info=True)
+                break
     # Save to items_updated.json
     with open("items_updated.json", "w", encoding="utf-8") as f:
         import json
-        json.dump(items, f, indent=2)
-    return len(items)
+        json.dump(all_items, f, indent=2)
+    logging.info(f"Finished scraping. Total items saved: {len(all_items)}")
+    return len(all_items)
 
 @manage_group.subcommand(
     sub_cmd_name="update_items",
@@ -1177,24 +1208,26 @@ async def manage_update_items(ctx: SlashContext):
         await ctx.send("You do not have permission to use this command.", ephemeral=True)
         return
     await ctx.defer(ephemeral=True)
-    # Run the PowerShell script first
-    import subprocess
-    import os
-    try:
-        script_path = os.path.join(os.path.dirname(__file__), "scrapeitems.ps1")
-        subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", script_path], check=True)
-    except Exception as e:
-        await ctx.send(f"Failed to run scrapeitems.ps1: {e}")
-        return
+    await ctx.send("Starting item scrape from nwdb.info... this may take a moment.", ephemeral=True)
     count = await update_items_from_nwdb()
+    if count == 0:
+        await ctx.send("Scraped 0 items. No changes to commit.", ephemeral=True)
+        return
     try:
-        subprocess.run(["git", "add", "items.json"], check=True)
+        git_status_result = subprocess.run(["git", "status", "--porcelain", "items_updated.json"], capture_output=True, text=True, check=True)
+        if not git_status_result.stdout.strip():
+            await ctx.send(f"Scraped {count} items, but there are no changes to commit. The local file is already up-to-date.", ephemeral=True)
+            return
         subprocess.run(["git", "add", "items_updated.json"], check=True)
-        subprocess.run(["git", "commit", "-m", f"Update items.json/items_updated.json ({count} items scraped from nwdb.info)"], check=True)
+        commit_message = f"Update items_updated.json ({count} items scraped from nwdb.info)"
+        subprocess.run(["git", "commit", "-m", commit_message], check=True)
         subprocess.run(["git", "push"], check=True)
-        await ctx.send(f"✅ Ran scrapeitems.ps1, scraped and uploaded {count} items to items.json/items_updated.json and pushed to git.")
+        await ctx.send(f"✅ Scraped and uploaded {count} items to items_updated.json and pushed to git.", ephemeral=True)
+    except subprocess.CalledProcessError as e:
+        error_output = e.stderr or e.stdout or "No output from command."
+        await ctx.send(f"Scraped {count} items, but a git command failed: {e}\n```\n{error_output}\n```", ephemeral=True)
     except Exception as e:
-        await ctx.send(f"Scraped {count} items, but git commit/push failed: {e}")
+        await ctx.send(f"An unexpected error occurred during git operations: {e}", ephemeral=True)
 
 @settings.subcommand(sub_cmd_name="permit", sub_cmd_description="Grants a user bot management permissions.")
 @slash_option("user", "The user to grant permissions to.", opt_type=OptionType.USER, required=True)

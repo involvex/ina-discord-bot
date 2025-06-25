@@ -114,32 +114,46 @@ def scrape_nwdb_perks():
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
-
-        try:
-            response = requests.get(current_url, headers=headers, timeout=15)
-            response.raise_for_status() 
-            json_data = response.json()
-        except requests.exceptions.HTTPError as http_err:
-            logging.error(f"HTTP error fetching page {current_url}: {http_err}")
-            break 
-        except requests.exceptions.RequestException as req_err:
-            logging.error(f"Error fetching page {current_url}: {req_err}")
-            break
-        except requests.exceptions.JSONDecodeError as json_err:
-            logging.error(f"Error decoding JSON from {current_url}. Content was: {response.text[:200]}... Error: {json_err}")
-            # Save problematic content for debugging
-            debug_html_filename = f"debug_page_{page_num}_non_json_content.html"
+        
+        retries = 3
+        for attempt in range(retries):
             try:
-                with open(debug_html_filename, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                print(f"Content of page {page_num} saved to {debug_html_filename} for inspection.")
-            except Exception as e_write:
-                logging.error(f"Could not write debug HTML file: {e_write}")
-            break
+                response = requests.get(current_url, headers=headers, timeout=15)
+                response.raise_for_status() 
+                json_data = response.json()
+                break # Success, break from retry loop
+            except requests.exceptions.HTTPError as http_err:
+                logging.error(f"HTTP error fetching page {current_url} (Attempt {attempt + 1}/{retries}): {http_err}")
+                if attempt < retries - 1:
+                    time.sleep(2) # Wait before retrying
+                else:
+                    logging.error(f"Failed to fetch page {current_url} after {retries} attempts. Skipping.")
+                    json_data = None # Indicate failure
+                    break
+            except requests.exceptions.RequestException as req_err:
+                logging.error(f"Network error fetching page {current_url} (Attempt {attempt + 1}/{retries}): {req_err}")
+                if attempt < retries - 1:
+                    time.sleep(2) # Wait before retrying
+                else:
+                    logging.error(f"Failed to fetch page {current_url} after {retries} attempts. Skipping.")
+                    json_data = None # Indicate failure
+                    break
+            except requests.exceptions.JSONDecodeError as json_err:
+                logging.error(f"Error decoding JSON from {current_url} (Attempt {attempt + 1}/{retries}). Content was: {response.text[:200]}... Error: {json_err}")
+                # Save problematic content for debugging
+                debug_html_filename = f"debug_page_{page_num}_non_json_content.html"
+                try:
+                    with open(debug_html_filename, 'w', encoding='utf-8') as f:
+                        f.write(response.text)
+                    print(f"Content of page {page_num} saved to {debug_html_filename} for inspection.")
+                except Exception as e_write:
+                    logging.error(f"Could not write debug HTML file: {e_write}")
+                json_data = None # Indicate failure
+                break
 
-        if not json_data.get('success') or not json_data.get('data'):
-            logging.warning(f"JSON response for page {page_num} indicates failure or no data.")
-            break
+        if json_data is None or not json_data.get('success') or not json_data.get('data'):
+            logging.warning(f"Skipping page {page_num} due to fetch/parse failure or no data.")
+            break # Stop if a page fails completely
 
         if page_num == 1 and json_data.get('pageCount'):
             actual_page_count = json_data['pageCount']

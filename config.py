@@ -129,3 +129,4 @@ def setup_logging():
 # --- Data File URLs/Paths ---
 ITEMS_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/items.csv" # Use GITHUB_REPO_NAME
 PERKS_FILE = 'perks.csv' # Default filename for local perks CSV
+PERKS_SCRAPED_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/perks_scraped.csv" # URL for scraped perks
