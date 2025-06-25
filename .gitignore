@@ -27,3 +27,8 @@ items.json
 items_updated.json
 bfg.jar
 items.csv
+craftingsrecipe.csv
+tracked_recipes.json
+new_world_data2.db
+main_old.py
+main_notused.py
