@@ -1,7 +1,10 @@
 import csv
 import os
 from typing import Dict, Optional
+import logging
 from config import PERKS_FILE # Import PERKS_FILE
+
+logger = logging.getLogger(__name__)
 
 def load_perks_from_csv(csv_filepath: str = PERKS_FILE) -> Dict[str, Dict[str, str]]:
     """Loads perk data from a CSV file into a dictionary.
@@ -20,7 +23,7 @@ def load_perks_from_csv(csv_filepath: str = PERKS_FILE) -> Dict[str, Dict[str, s
             reader = csv.DictReader(csvfile)
             
             if not reader.fieldnames:
-                print(f"Warning: Perk CSV file '{full_path}' is empty or has no headers.")
+                logger.warning(f"Perk CSV file '{full_path}' is empty or has no headers.")
                 return perks_data
             
             # Determine the perk name column (case-insensitive)
@@ -42,27 +45,28 @@ def load_perks_from_csv(csv_filepath: str = PERKS_FILE) -> Dict[str, Dict[str, s
                 elif 'Name' in reader.fieldnames: # Check 'Name'
                      perk_name_column = 'Name'
                 else:
-                    print(f"Error: No suitable perk name column found in '{full_path}'. Looked for {possible_name_columns} and 'name'/'Name'.")
+                    logger.error(f"No suitable perk name column found in '{full_path}'. Looked for {possible_name_columns} and 'name'/'Name'.")
                     return perks_data # Return empty if no name column
 
             for row in reader:
                 perk_name_val = row.get(perk_name_column)
                 if perk_name_val and perk_name_val.strip(): # Ensure perk name is not empty
                     perks_data[perk_name_val.lower()] = row # Store the original row dictionary
-                # else:
-                #     print(f"Warning: Row found with empty or missing perk name in '{full_path}': {row}")
+                else:
+                    logger.warning(f"Row found with empty or missing perk name in '{full_path}': {row}")
 
     except FileNotFoundError:
-        print(f"Error: The perk CSV file '{full_path}' was not found.")
+        logger.error(f"The perk CSV file '{full_path}' was not found.")
         return {} 
     except Exception as e:
-        print(f"An error occurred while reading the perk CSV file '{full_path}': {e}")
+        logger.exception(f"An error occurred while reading the perk CSV file '{full_path}': {e}")
         return {} 
         
     return perks_data
 
 if __name__ == '__main__':
     # Example usage for testing perks.py directly
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     all_perks = load_perks_from_csv()
     if all_perks:
         print(f"Loaded {len(all_perks)} perks from '{PERKS_FILE}'.")
@@ -75,4 +79,4 @@ if __name__ == '__main__':
             else:
                 break
     else:
-        print(f"Failed to load perks from '{PERKS_FILE}'.")
+        logger.error(f"Failed to load perks from '{PERKS_FILE}'.")

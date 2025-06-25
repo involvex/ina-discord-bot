@@ -1,6 +1,19 @@
 # main.py
 import os
 import sys
+from pathlib import Path
+# --- Forcefully add project root to the Python path ---
+# This is a robust way to ensure modules are found, even if the script is
+# run from a different directory or with a misconfigured environment.
+try:
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+except Exception as e:
+    # Use print as a fallback if logging fails
+    print(f"CRITICAL: Could not set up sys.path. Error: {e}")
+# --- End of new block ---
+
 import asyncio
 import time
 import random # Added import for random
@@ -8,7 +21,6 @@ import logging
 
 from interactions import Activity, ActivityType
 
-# --- Configuration & Setup ---
 from config import (
     __version__ as config_version,
     NW_FUNNY_STATUSES,
@@ -16,10 +28,6 @@ from config import (
     SILLY_UPTIME_MESSAGES,
 )
 from bot_client import bot
-# Add the project root directory to the Python path
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
-
 from common_utils import format_uptime
 
 # Load environment variables from .env file
@@ -28,7 +36,10 @@ load_dotenv()
 
 # Initialize logging
 from config import setup_logging # Ensure setup_logging is imported from config
+# We call setup_logging() here to ensure subsequent log messages are captured.
 setup_logging() # Call setup_logging from config
+logging.info(f"Project root '{project_root}' added to sys.path.")
+logging.info(f"Current sys.path: {sys.path}")
 
 # --- Background Tasks ---
 async def rotate_funny_presence(bot_instance, interval=300): # Interval of 5 minutes
@@ -61,32 +72,39 @@ async def rotate_funny_presence(bot_instance, interval=300): # Interval of 5 min
 
         await asyncio.sleep(interval)
 
+def discover_extensions(*root_dirs: str) -> list[str]:
+    """
+    Dynamically discovers extensions in the specified root directories.
+    Converts file paths like 'commands/new_world/items.py' to 'commands.new_world.items'.
+    """
+    extensions = []
+    for root_dir in root_dirs:
+        for path in Path(root_dir).rglob("*.py"):
+            # Don't treat __init__.py files as extensions
+            if path.stem == "__init__":
+                continue
+            extensions.append(".".join(path.with_suffix("").parts))
+    return extensions
+
 # --- Bot Events ---
 @bot.event()
 async def on_ready():
     """
-    Called when the bot is ready and connected to Discord.
-    Loads all command and event extensions and starts background tasks.
+    Called when the bot is ready. This can be called multiple times on reconnects.
+    The initial setup (loading extensions, syncing commands) should only run once.
     """
-    print("--------------------------------------------------")
-    logging.info("Bot is starting up...")
+    # This check prevents the setup from running again on reconnects
+    if getattr(bot, "has_been_started", False):
+        return
 
+    logging.info("--------------------------------------------------")
+    logging.info("Bot is performing first-time startup...")
     # To prevent rate limits from syncing on every extension load, we disable it temporarily
     bot.sync_ext = False
 
     # Load all command and event extensions
-    # Note: commands.admin will schedule its own check_for_updates task
-    extensions = [
-        "commands.general", 
-        "commands.new_world.items", 
-        "commands.new_world.perks",
-        "commands.new_world.crafting", 
-        "commands.new_world.builds",
-        "commands.admin", 
-        "commands.settings_commands", 
-        "events.guild_events", 
-        "events.message_events"
-    ]
+    extensions = discover_extensions("commands", "events")
+
     for extension in extensions:
         try:
             bot.load_extension(extension)
@@ -102,13 +120,16 @@ async def on_ready():
         logging.error(f"Failed to synchronise application commands: {e}", exc_info=True)
     bot.sync_ext = True
 
+    # Set a flag to indicate that the initial setup is complete
+    bot.has_been_started = True
+
     # Start background tasks
     # rotate_funny_presence is a general bot task and can remain here or be moved to a general extension.
     asyncio.create_task(rotate_funny_presence(bot, interval=300))
     
     logging.info(f"Ina is ready! Logged in as {bot.user.username} ({bot.user.id})")
     logging.info(f"Version: {config_version}")
-    print("--------------------------------------------------")
+    logging.info("--------------------------------------------------")
 
 # --- Main Execution ---
 import sqlite3
@@ -150,14 +171,16 @@ def load_all_game_data():
                 f"Please run 'create_db.py' manually if possible. Bot may not function correctly.", exc_info=True
             )
     
-    if os.path.exists(DB_NAME):
-        logging.info(f"Database '{DB_NAME}' is available. Bot will use it for data lookups.")
-    else:
+    if not os.path.exists(DB_NAME):
         logging.critical(
-            f"CRITICAL: Database file '{DB_NAME}' not found. "
+            f"CRITICAL: Database file '{DB_NAME}' not found and could not be created. "
             f"The bot relies on this database for item, perk, and recipe data. "
-            f"Automatic creation failed or was not possible. Please ensure 'create_db.py' can run successfully or create the DB manually."
+            f"Automatic creation failed or was not possible. The bot cannot start without it. Exiting."
         )
+        sys.exit(1)
+    else:
+        logging.info(f"Database '{DB_NAME}' is available. Bot will use it for data lookups.")
+
     logging.info("Game data verification/creation process complete.")
 
 if __name__ == "__main__":

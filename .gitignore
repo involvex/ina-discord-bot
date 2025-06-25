@@ -21,13 +21,13 @@ __pycache__
 .mypy_cache/
 perks.csv
 perks_scraped.csv
-new_world_world_data.db
-perks_buddy.csv
+# new_world_world_data.db  <- Removed, as it's intended to be committed by update_perks.sh
+# perks_buddy.csv    <- Removed, as it's intended to be committed by update_perks.sh
 items.json
 items_updated.json
 bfg.jar
 items.csv
-cratingsrecipe.csv
+craftingsrecipe.csv # Corrected typo
 import csv.txt
 main notused.py
 main_old.py

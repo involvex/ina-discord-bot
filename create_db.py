@@ -50,7 +50,7 @@ def parse_recipes(csv_data):
             recipes.append({"Name": recipe_name, "Ingredients": ingredients})
     return recipes
 
-ITEMS_CSV_PATH = "items.csv" #https://raw.githubusercontent.com/involvex/ina-discord-bot/refs/heads/main/items.csv
+ITEMS_CSV_PATH = "items.csv" #https://raw.githubusercontent.com/involvex/ina-discord-bot/refs/heads/beta/items.csv
 
 def fetch_recipes_data(base_url="https://nwdb.info", retries=3, delay=0.5):
     all_recipes_data = []
@@ -120,7 +120,7 @@ def fetch_recipes_data(base_url="https://nwdb.info", retries=3, delay=0.5):
 CSV_SOURCES = {
     "items": ITEMS_CSV_URL, # Use the imported constant
     # "perks" will be handled specially from a local file perks_buddy.csv
-    # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot/main/perks_scraped.csv", # Kept for reference, but not used
+    # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot/beta/perks_scraped.csv", # Kept for reference, but not used
 }
 
 def fetch_csv_data(url, retries=3, delay=5):
