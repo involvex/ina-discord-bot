@@ -80,8 +80,8 @@ def discover_extensions(*root_dirs: str) -> list[str]:
     extensions = []
     for root_dir in root_dirs:
         for path in Path(root_dir).rglob("*.py"):
-            # Don't treat __init__.py files as extensions
-            if path.stem == "__init__":
+            # Don't treat __init__.py or utils.py files as extensions
+            if path.stem in ("__init__", "utils"):
                 continue
             extensions.append(".".join(path.with_suffix("").parts))
     return extensions
