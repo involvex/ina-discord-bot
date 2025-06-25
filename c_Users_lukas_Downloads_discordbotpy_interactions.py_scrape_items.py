@@ -44,20 +44,29 @@ def scrape_nwdb_items():
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
-        try:
-            response = requests.get(current_url, headers=headers, timeout=20)
-            response.raise_for_status()
-            json_data = response.json()
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error fetching page {current_url}: {e}")
-            break
-        except requests.exceptions.JSONDecodeError:
-            logging.error(f"Error decoding JSON from {current_url}. Content: {response.text[:200]}")
-            break
+        retries = 3
+        for attempt in range(retries):
+            try:
+                response = requests.get(current_url, headers=headers, timeout=20)
+                response.raise_for_status()
+                json_data = response.json()
+                break # Success, break from retry loop
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Error fetching page {current_url} (Attempt {attempt + 1}/{retries}): {e}")
+                if attempt < retries - 1:
+                    time.sleep(2) # Wait before retrying
+                else:
+                    logging.error(f"Failed to fetch page {current_url} after {retries} attempts. Skipping.")
+                    json_data = None # Indicate failure
+                    break
+            except requests.exceptions.JSONDecodeError:
+                logging.error(f"Error decoding JSON from {current_url} (Attempt {attempt + 1}/{retries}). Content: {response.text[:200]}")
+                json_data = None # Indicate failure
+                break
 
-        if not json_data.get('success') or not json_data.get('data'):
-            logging.warning(f"JSON response for page {page_num} indicates failure or no data.")
-            break
+        if json_data is None or not json_data.get('success') or not json_data.get('data'):
+            logging.warning(f"Skipping page {page_num} due to fetch/parse failure or no data.")
+            break # Stop if a page fails completely
 
         if page_num == 1 and json_data.get('pageCount'):
             actual_page_count = json_data['pageCount']
