@@ -103,6 +103,14 @@ else
 fi
 echo ""
 
+# --- Project Cleanup ---
+echo "INFO: Cleaning up leftover project files..."
+rm -f "CONTRIBUTING.rst"
+rm -rf "tests"
+echo "INFO: Cleanup complete."
+
+echo ""
+
 # --- Ensure previous bot process is terminated ---
 echo "INFO: Terminating any existing bot processes..."
 pkill -f "python3 main.py" || true # Kill any running python3 main.py processes, '|| true' prevents script from exiting if no process is found
