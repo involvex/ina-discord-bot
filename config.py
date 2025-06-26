@@ -135,4 +135,4 @@ def setup_logging():
 ITEMS_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/items.csv" # Use GITHUB_REPO_NAME
 PERKS_FILE = 'perks.csv' # Default filename for local perks CSV
 PERKS_SCRAPED_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/perks_scraped.csv" # URL for scraped perks
-LEGACY_CRAFTING_RECIPES_CSV_URL = 'https://raw.githubusercontent.com/involvex/ina-discord-bot/98d8c5b93799ac7d75c54a1543187a6a5a938e94/craftingsrecipe.csv'
+CRAFTING_RECIPES_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/craftingsrecipe.csv" # New primary URL for recipes

@@ -9,130 +9,21 @@ import csv
 import json # For serializing ingredients
 import re # For cleaning up ingredient names
 import logging # Import logging module
-from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, LEGACY_CRAFTING_RECIPES_CSV_URL  # Import new URL
+from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, CRAFTING_RECIPES_CSV_URL
 from scrape_items import scrape_nwdb_items, OUTPUT_CSV_FILE as SCRAPED_ITEMS_CSV
-
-def parse_recipes(csv_data):
-    """
-    Parses CSV data containing crafting recipes and extracts relevant information.
-
-    Args:
-        csv_data (str): A string containing CSV data of crafting recipes.
-
-    Returns:
-        list: A list of dictionaries, where each dictionary represents a recipe
-              with 'Name' and 'Ingredients' (a list of {item: qty} dictionaries).
-    """
-    recipes = []
-    csvfile = StringIO(csv_data)
-    reader = csv.DictReader(csvfile)
-
-    for row in reader:
-        recipe_name = row.get("Name")
-        if not recipe_name:
-            continue
-
-        ingredients = []
-        for i in range(1, 8): # Iterate through Ingredient1 to Ingredient7
-            ingredient_key = f"Ingredient{i}"
-            qty_key = f"Qty{i}"
-
-            ingredient_name = row.get(ingredient_key)
-            qty_str = row.get(qty_key)
-
-            if ingredient_name and qty_str:
-                try:
-                    qty = int(qty_str)
-                    if qty > 0: # Only add ingredients with positive quantities
-                        ingredients.append({"item": ingredient_name, "qty": qty})
-                except ValueError:
-                    pass # Handle cases where Qty is not a valid integer
-        if ingredients: # Only add recipes that have at least one ingredient
-            recipes.append({"Name": recipe_name, "Ingredients": ingredients})
-    return recipes
 
 ITEMS_CSV_PATH = "items.csv" #https://raw.githubusercontent.com/involvex/ina-discord-bot/refs/heads/beta/items.csv
 
-def fetch_recipes_data(base_url="https://nwdb.info", retries=3, delay=0.5):
-    all_recipes_data = []
-    actual_page_count = 1 # Will be updated from first page
-    logging.info(f"Starting recipe scraping from {base_url}/db/recipes...")
-
-    for page_num in range(1, actual_page_count + 1):
-        current_url = f"{base_url}/db/recipes/page/{page_num}.json"
-        logging.info(f"Fetching recipe page: {current_url}")
-
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        json_data = None
-        for attempt in range(retries):
-            try:
-                response = requests.get(current_url, headers=headers, timeout=20)
-                response.raise_for_status()
-                json_data = response.json()
-                break
-            except requests.exceptions.RequestException as e:
-                logging.error(f"Error fetching recipe page {current_url} (Attempt {attempt + 1}/{retries}): {e}")
-                if attempt < retries - 1:
-                    time.sleep(delay)
-                else:
-                    logging.error(f"Failed to fetch recipe page {current_url} after {retries} attempts. Skipping.")
-                    json_data = None
-                    break
-            except json.JSONDecodeError:
-                logging.error(f"Error decoding JSON from {current_url} (Attempt {attempt + 1}/{retries}). Content: {response.text[:200]}")
-                json_data = None
-                break
-
-        if json_data is None or not json_data.get('success') or not json_data.get('data'):
-            logging.warning(f"Skipping recipe page {page_num} due to fetch/parse failure or no data.")
-            break
-
-        if page_num == 1 and json_data.get('pageCount'):
-            actual_page_count = json_data['pageCount']
-            logging.info(f"Total recipe pages to scrape: {actual_page_count}")
-
-        for recipe_entry in json_data['data']:
-            try:
-                output_item_name = recipe_entry.get('output', {}).get('name')
-                if not output_item_name:
-                    logging.warning(f"Skipping recipe entry with no output item name: {recipe_entry}")
-                    continue
-
-                ingredients = recipe_entry.get('ingredients', []) # Already a list of dicts
-                all_recipes_data.append({
-                    'output_item_name': output_item_name,
-                    'station': recipe_entry.get('station'),
-                    'skill': recipe_entry.get('tradeskill'),
-                    'skill_level': recipe_entry.get('tradeskillLevel'),
-                    'tier': recipe_entry.get('tier'),
-                    'ingredients': json.dumps(ingredients),
-                    'raw_recipe_data': json.dumps(recipe_entry)
-                })
-            except Exception as e:
-                logging.error(f"Error processing recipe entry: {e}. Entry: {recipe_entry}", exc_info=True) # Added exc_info=True
-        time.sleep(delay)
-
-    logging.info(f"Scraped {len(all_recipes_data)} recipes.")
-    return all_recipes_data
-
-CSV_SOURCES = {
-    "items": ITEMS_CSV_URL, # Use the imported constant
-    # "perks" will be handled specially from a local file perks_buddy.csv
-    # "perks_legacy": "https://raw.githubusercontent.com/involvex/ina-discord-bot/beta/perks_scraped.csv", # Kept for reference, but not used
-}
-
-def fetch_csv_data(url, retries=3, delay=5):
+def fetch_csv_data(url, retries=3, delay=5, save_path=None):
     logging.info(f"Fetching CSV from {url}...")
     for i in range(retries):
         try:
             response = requests.get(url, timeout=15)
             response.raise_for_status()  # Raise an exception for HTTP errors
             # Save to disk for possible debugging, but will be deleted after DB population
-            with open(ITEMS_CSV_PATH, "w", encoding="utf-8") as f:
-                f.write(response.text)
+            if save_path:
+                with open(save_path, "w", encoding="utf-8") as f:
+                    f.write(response.text)
             return response.text
         except requests.RequestException as e:
             logging.error(f"Error fetching CSV from {url}: {e}")
@@ -143,6 +34,43 @@ def fetch_csv_data(url, retries=3, delay=5):
                 logging.error(f"Failed to fetch CSV from {url} after {retries} attempts.")
                 return None
     return None # Should not be reached, but for clarity
+
+def fetch_and_parse_crafting_recipes(url: str, retries=3, delay=0.5):
+    logging.info(f"Fetching crafting recipes from {url}...")
+    csv_data = fetch_csv_data(url, retries=retries, delay=delay)
+    if not csv_data:
+        logging.error("Failed to fetch crafting recipe CSV data.")
+        return []
+
+    recipes_for_db = []
+    reader = csv.DictReader(StringIO(csv_data))
+    for row in reader:
+        output_item_name = row.get("Name")
+        if not output_item_name:
+            continue
+
+        ingredients = []
+        for i in range(1, 8):
+            ing_name = row.get(f"Ingredient{i}")
+            ing_qty_str = row.get(f"Qty{i}")
+            if ing_name and ing_qty_str:
+                try:
+                    ing_qty = int(ing_qty_str)
+                    if ing_qty > 0:
+                        ingredients.append({"item": ing_name, "quantity": ing_qty})
+                except (ValueError, TypeError):
+                    continue
+
+        recipes_for_db.append({
+            'output_item_name': output_item_name,
+            'station': row.get('CraftingStation'),
+            'skill': row.get('Tradeskill'),
+            'skill_level': row.get('Level'),
+            'tier': row.get('Tier'),
+            'ingredients': json.dumps(ingredients),
+            'raw_recipe_data': json.dumps(row) # Store the whole row for full context
+        })
+    return recipes_for_db
 
 def cleanup_items_csv():
     if os.path.exists(ITEMS_CSV_PATH):
@@ -170,7 +98,7 @@ def populate_db():
 
         # --- Populate items table from GitHub CSV ---
         logging.info(f"Fetching comprehensive item data from {ITEMS_CSV_URL}...")
-        items_csv_data = fetch_csv_data(ITEMS_CSV_URL)
+        items_csv_data = fetch_csv_data(ITEMS_CSV_URL, save_path=ITEMS_CSV_PATH)
         if items_csv_data:
             try:
                 # Use the locally saved file from fetch_csv_data
@@ -224,23 +152,15 @@ def populate_db():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_perks_name_lower ON perks (lower(name))")
             logging.info(f"Successfully loaded combined data into 'perks' table.")
 
-        # --- Populate recipes table ---
-        recipes_data = fetch_recipes_data()
-        if recipes_data:
-            recipes_df = pd.DataFrame(recipes_data)
+        # --- Populate recipes table from GitHub CSV ---
+        recipes_data_for_db = fetch_and_parse_crafting_recipes(CRAFTING_RECIPES_CSV_URL)
+        if recipes_data_for_db:
+            recipes_df = pd.DataFrame(recipes_data_for_db)
             recipes_df.to_sql('recipes', conn, if_exists='replace', index=False)
-            logging.info(f"Successfully added {len(recipes_df)} recipes to the 'recipes' table.")
+            logging.info(f"Successfully added {len(recipes_df)} recipes to the 'recipes' table from GitHub CSV.")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_recipes_output_item_name_lower ON recipes (lower(output_item_name))")
-
-        # --- Populate parsed_recipes table (legacy) ---
-        legacy_csv_data = fetch_csv_data(LEGACY_CRAFTING_RECIPES_CSV_URL)
-        if legacy_csv_data:
-            parsed_legacy_recipes = parse_recipes(legacy_csv_data)
-            recipes_to_insert = [{'Name': r['Name'], 'Ingredients': json.dumps(r['Ingredients'])} for r in parsed_legacy_recipes]
-            recipes_df = pd.DataFrame(recipes_to_insert)
-            recipes_df.to_sql('parsed_recipes', conn, if_exists='replace', index=False)
-            logging.info(f"Successfully added {len(recipes_df)} recipes to the 'parsed_recipes' table.")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_parsed_recipes_name_lower ON parsed_recipes (lower(Name))")
+        else:
+            logging.warning("No recipes loaded from GitHub CSV. 'recipes' table might be empty.")
 
         logging.info("All tables created and indexed in temporary database.")
 
