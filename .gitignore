@@ -1,37 +1,20 @@
-# env/venv/gh-based
-*.egg
-*.egg-info/
-*.eggs/
 *.pyc
-.idea
-.cache/
-_build/
-build/
-dist/
+__pycache__/
+*.db
+*.tmp
 .env
-.venv/
-venv/ # Explicitly ignore the venv directory
-.vscode
-__pycache__
-*.token
-*.pypirc
-*.code-workspace
-/coverage.xml
-/TestResults.xml
-/.coverage
-.mypy_cache/
-# The following files are now tracked by Git and should NOT be ignored:
-# perks.csv
-# perks_scraped.csv
-# new_world_data.db
-# perks_buddy.csv
-items.json
-items_updated.json
-bfg.jar
+.last_commit_hash
 items.csv
-craftingsrecipe.csv
-import csv.txt
-main notused.py
+perks_scraped.csv
+saved_builds.json
+bot_managers.json
+tracked_recipes.json
 main_old.py
-new_world_data2.db
-.env
+main_notused.py
+# IDE specific files
+.idea/
+.vscode/
+
+# OS generated files
+.DS_Store
+Thumbs.db

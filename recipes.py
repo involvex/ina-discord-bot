@@ -7,15 +7,15 @@ from bs4 import BeautifulSoup
 import json
 import logging
 import sqlite3
-import aiosqlite # Import aiosqlite
+import aiosqlite
 from typing import Optional, Dict, Any, Set
 
 # This import assumes the project root is in sys.path, allowing top-level modules
 # to import from sub-packages. This is a common pattern in bot structures.
 from commands.new_world.utils import resolve_item_name_for_lookup
 from typing import Optional, Dict, Any, Set
-from config import DB_NAME, TRACKED_RECIPES_FILE # Import DB_NAME and TRACKED_RECIPES_FILE
-
+from typing import Optional, Dict, Any, Set, List
+from config import DB_NAME, TRACKED_RECIPES_FILE
 
 def track_recipe(user_id: str, item_name: str, recipe: dict):
     try:
