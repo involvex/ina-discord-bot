@@ -82,7 +82,7 @@ else
     git reset --hard "origin/$GitBranch"
 
     echo "INFO: Cleaning untracked and ignored files and directories..."
-    git clean -fdx
+    git clean -fd # Changed from -fdx to -fd to preserve ignored files like .env
 
     echo "INFO: Local repository forcefully updated to origin/$GitBranch and cleaned."
 fi
@@ -120,7 +120,7 @@ python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 # Install/update dependencies
 if [ -f "requirements.txt" ]; then
   echo "INFO: Installing/updating dependencies from requirements.txt..."
-  python3 -m pip install -U -r requirements.txt
+  "$VENV_PATH/bin/python3" -m pip install -U -r requirements.txt # Removed --no-cache-dir to allow pip to use its cache
   echo "INFO: Dependencies installed/updated successfully."
 else
   echo "WARNING: requirements.txt not found. Skipping dependency installation." >&2
