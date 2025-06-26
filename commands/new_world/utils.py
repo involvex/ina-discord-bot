@@ -45,10 +45,29 @@ def get_any(item_dict: Dict[str, Any], keys: List[str], default: Any) -> Any:
 # Define PERK_PRETTY outside the class if it's a global constant
 def resolve_item_name_for_lookup(item_name: str) -> str:
     """Resolves an item name, applying generic material mappings for lookup.
-    This should be used before attempting to find a recipe or item details for a material.
+    This should be used before attempting to find a recipe or item details for a material or a user-provided item name.
     """
-    # Check if the item_name (case-insensitive) exists in the mapping
-    return GENERIC_MATERIAL_MAPPING.get(item_name.lower(), item_name)
+    original_name_lower = item_name.lower()
+
+    # 1. Check generic material mapping (e.g., "ingott5" -> "Asmodeum")
+    # This is for raw ingredient names from CSV/DB that are not proper item names.
+    mapped_name = GENERIC_MATERIAL_MAPPING.get(original_name_lower)
+    if mapped_name:
+        return mapped_name
+
+    # 2. Check items_data_cache for display name to internal ID mappings,
+    # and then potentially resolve that internal ID if it's a generic one.
+    item_data = items_data_cache.get(original_name_lower)
+    if item_data:
+        # If the item has an internal ID that maps to a generic material, use that.
+        # This handles cases like "Prismatic Chain" (display name) -> "IngotT53" (internal ID) -> "Prismatic Ingot" (generic material name)
+        internal_id = get_any(item_data, ['Item ID', 'ItemID', 'Item_ID'], None)
+        if internal_id and str(internal_id).lower() in GENERIC_MATERIAL_MAPPING:
+            return GENERIC_MATERIAL_MAPPING[str(internal_id).lower()]
+        return get_any(item_data, ['Name', 'name'], item_name) # Return the canonical name from the data
+
+    # 3. If not found in generic mapping or direct cache lookup, return original name
+    return item_name
 
 
 PERK_PRETTY = {

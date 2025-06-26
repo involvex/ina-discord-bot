@@ -92,43 +92,8 @@ class NewWorldItemCommands(Extension):
 
             return await ctx.send(embeds=embed)
 
-        # 3. If item not found, check if a recipe exists for it
-        recipe_dict = await get_recipe(item_name)
-        if recipe_dict:
-            output_item_name = get_any(recipe_dict, ['output_item_name', 'Name'], item_name).title()
-            station = get_any(recipe_dict, ['station', 'Station'], '-')
-            skill = get_any(recipe_dict, ['skill', 'tradeskill', 'Tradeskill'], '-')
-            skill_level = get_any(recipe_dict, ['skill_level', 'tradeskillLevel', 'Recipe Level'], '-')
-            tier = get_any(recipe_dict, ['tier', 'Tier'], '-')
-
-            embed = Embed(title=f"Recipe: {output_item_name}", color=0x9b59b6)
-            embed.description = f"No direct item details found, but a recipe for '{item_name}' exists."
-            embed.add_field(name="Station", value=str(station), inline=True)
-            embed.add_field(name="Skill", value=str(skill), inline=True)
-            embed.add_field(name="Skill Level", value=str(skill_level), inline=True)
-            embed.add_field(name="Tier", value=str(tier), inline=True)
-            
-            ingredients = recipe_dict.get("ingredients", [])
-            ing_lines = [f"• {ing.get('quantity', '?')} {ing.get('item', 'Unknown')}" for ing in ingredients]
-            embed.add_field(name="Ingredients", value="\n".join(ing_lines) if ing_lines else "-", inline=False)
-
-            # Try to get an icon for the crafted item
-            crafted_item_name = recipe_dict.get('output_item_name', item_name)
-            item_details_for_recipe = await find_item_in_db(crafted_item_name, exact_match=True)
-            if item_details_for_recipe:
-                icon_path = get_any(item_details_for_recipe[0], ['Icon URL', 'icon_url', 'Icon', 'icon', 'Icon Path', 'Icon_Path'], None)
-                if icon_path and isinstance(icon_path, str) and icon_path.lower().startswith("http"):
-                    try:
-                        embed.set_thumbnail(url=str(icon_path).strip())
-                    except Exception as e:
-                        logger.warning(f"Failed to set thumbnail for recipe '{item_name}' with URL '{icon_path}': {e}")
-                else:
-                    logger.warning(f"Invalid icon path for recipe '{item_name}': {icon_path}")
-            
-            return await ctx.send(embeds=embed)
-
-        # 4. If neither item nor recipe is found, send not found message.
-        await ctx.send(f"Item or recipe for '{item_name}' not found.", ephemeral=True)
+        # 3. If item is not found, send not found message.
+        await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
 
     @nwdb.autocomplete("item_name")
     async def nwdb_autocomplete(self, ctx: AutocompleteContext):
