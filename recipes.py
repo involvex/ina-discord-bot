@@ -49,62 +49,63 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
     resolved_item_name = resolve_item_name_for_lookup(item_name)
     try:
         async with aiosqlite.connect(DB_NAME) as conn:
-            conn.row_factory = aiosqlite.Row # Set row_factory on the connection
-            async with conn.cursor() as cursor: # Use async with for cursor as well.
+            conn.row_factory = aiosqlite.Row  # Set row_factory on the connection
+            async with conn.cursor() as cursor:  # Use async with for cursor as well.
                 # All operations that use 'cursor' should be within this 'async with cursor' block.
+
                 # 1. Try to fetch from the 'recipes' table (from nwdb.info)
                 await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
-                recipe_row = await cursor.fetchone() # This line was correctly indented.
-            # 1. Try to fetch from the 'recipes' table (from nwdb.info)
-            logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
-            if recipe_row:
-                try:
-                # The 'raw_recipe_data' column stores the full JSON object from nwdb.info
-                recipe_data = json.loads(recipe_row["raw_recipe_data"])
+                recipe_row = await cursor.fetchone()
 
-                # --- NORMALIZATION ---
-                # Standardize the ingredient list to use 'item' and 'quantity' keys
-                normalized_ingredients = []
-                for ing in recipe_data.get('ingredients', []):
-                    # nwdb.info uses 'name' and 'quantity', ensure they are present
-                    if 'name' in ing and 'quantity' in ing:
-                        # Resolve ingredient names from nwdb.info recipes as well, just in case
-                        # (though nwdb.info names are usually clean, this adds robustness)
-                        resolved_ing_name = resolve_item_name_for_lookup(ing['name'])
-                        normalized_ingredients.append({'item': resolved_ing_name, 'quantity': ing['quantity']})
-                recipe_data['ingredients'] = normalized_ingredients
-                # --- END NORMALIZATION ---
+                logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
+                if recipe_row:
+                    try:
+                        # The 'raw_recipe_data' column stores the full JSON object from nwdb.info
+                        recipe_data = json.loads(recipe_row["raw_recipe_data"])
 
-                # Ensure 'output_item_name' is present, using input item_name as fallback
-                recipe_data.setdefault('output_item_name', resolved_item_name) # Use resolved name for output
-                return recipe_data
-                except (json.JSONDecodeError, KeyError) as e:
-                    logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}", exc_info=True)
-                    return None # Return None if JSON parsing fails
+                        # --- NORMALIZATION ---
+                        # Standardize the ingredient list to use 'item' and 'quantity' keys
+                        normalized_ingredients = []
+                        for ing in recipe_data.get('ingredients', []):
+                            # nwdb.info uses 'name' and 'quantity', ensure they are present
+                            if 'name' in ing and 'quantity' in ing:
+                                # Resolve ingredient names from nwdb.info recipes as well, just in case
+                                # (though nwdb.info names are usually clean, this adds robustness)
+                                resolved_ing_name = resolve_item_name_for_lookup(ing['name'])
+                                normalized_ingredients.append({'item': resolved_ing_name, 'quantity': ing['quantity']})
+                        recipe_data['ingredients'] = normalized_ingredients
+                        # --- END NORMALIZATION ---
 
-            # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
-            await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
-            legacy_recipe_row = await cursor.fetchone() # This line was correctly indented.
-            logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
-            if legacy_recipe_row:
-                try:
-                ingredients_list = json.loads(legacy_recipe_row["Ingredients"])
+                        # Ensure 'output_item_name' is present, using input item_name as fallback
+                        recipe_data.setdefault('output_item_name', resolved_item_name)  # Use resolved name for output
+                        return recipe_data
+                    except (json.JSONDecodeError, KeyError) as e:
+                        logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}", exc_info=True)
+                        return None  # Return None if JSON parsing fails
 
-                # --- NORMALIZATION ---
-                # Standardize the ingredient list to use 'item' and 'quantity' keys
-                normalized_ingredients = []
-                for ing in ingredients_list:
-                    # Legacy CSV uses 'item' and 'qty', ensure they are present
-                    if 'item' in ing and 'qty' in ing:
-                        # Crucially, resolve ingredient names from legacy CSV
-                        resolved_ing_name = resolve_item_name_for_lookup(ing['item'])
-                        normalized_ingredients.append({'item': resolved_ing_name, 'quantity': ing['qty']})
-                # --- END NORMALIZATION ---
-                
-                return {"output_item_name": resolved_item_name, "ingredients": normalized_ingredients}
-                except (json.JSONDecodeError, KeyError) as e:
-                    logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}", exc_info=True)
-                    return None # Return None if JSON parsing fails
+                # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
+                await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
+                legacy_recipe_row = await cursor.fetchone()
+                logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
+                if legacy_recipe_row:
+                    try:
+                        ingredients_list = json.loads(legacy_recipe_row["Ingredients"])
+
+                        # --- NORMALIZATION ---
+                        # Standardize the ingredient list to use 'item' and 'quantity' keys
+                        normalized_ingredients = []
+                        for ing in ingredients_list:
+                            # Legacy CSV uses 'item' and 'qty', ensure they are present
+                            if 'item' in ing and 'qty' in ing:
+                                # Crucially, resolve ingredient names from legacy CSV
+                                resolved_ing_name = resolve_item_name_for_lookup(ing['item'])
+                                normalized_ingredients.append({'item': resolved_ing_name, 'quantity': ing['qty']})
+                        # --- END NORMALIZATION ---
+
+                        return {"output_item_name": resolved_item_name, "ingredients": normalized_ingredients}
+                    except (json.JSONDecodeError, KeyError) as e:
+                        logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}", exc_info=True)
+                        return None  # Return None if JSON parsing fails
         logging.info(f"No recipe found for '{resolved_item_name}' in any table.")
         return None
     except aiosqlite.Error as e:

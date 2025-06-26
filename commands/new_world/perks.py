@@ -82,13 +82,14 @@ class NewWorldPerks(Extension):
     async def perk_autocomplete(self, ctx: AutocompleteContext):
         """Autocomplete for perk names."""
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-        if not search_term: return await ctx.send(choices=[])
+        if not search_term:
+            return await ctx.send(choices=[])
         matches = await find_perk_in_db(search_term, exact_match=False)
-        choices = [
-            {"name": str(name), "value": str(name)}
-            for row in matches[:25]
-            if (name := get_any(row, ['Name', 'name', 'PerkName'], None)) # Using get_any for robustness
-        ]
+        choices = []
+        for row in matches[:25]: # Limit to 25 results for Discord autocomplete
+            name = get_any(row, ['Name', 'name', 'PerkName'], None)
+            if name is not None and str(name).strip(): # Ensure name is not None or an empty string
+                choices.append({"name": str(name), "value": str(name)})
         await ctx.send(choices=choices)
 
 def setup(bot: Client):
