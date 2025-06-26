@@ -77,11 +77,12 @@ class NewWorldCrafting(Extension):
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
         if not search_term:
             return await ctx.send(choices=[])
-        matches = await find_all_item_names_in_db(search_term) # This returns a list of strings
-        choices = []
-        for name in matches:
-            if name is not None: # Ensure name is not None before adding
-                choices.append({"name": str(name), "value": str(name)})
+        # Ensure find_all_item_names_in_db returns a list of strings, and filter out any None values
+        # This part was already correct based on previous diffs, but included for context.
+        matches = [name for name in await find_all_item_names_in_db(search_term) if name is not None]
+        choices = [
+            {"name": str(name), "value": str(name)} for name in matches[:25] # Limit to 25 choices
+        ]
         await ctx.send(choices=choices)
 
     @slash_command(name="calculate_craft", description="Calculate resources needed to craft an item.")
@@ -108,11 +109,12 @@ class NewWorldCrafting(Extension):
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
         if not search_term:
             return await ctx.send(choices=[])
-        matches = await find_all_item_names_in_db(search_term) # This returns a list of strings
-        choices = []
-        for name in matches:
-            if name is not None: # Ensure name is not None before adding
-                choices.append({"name": str(name), "value": str(name)})
+        # Ensure find_all_item_names_in_db returns a list of strings, and filter out any None values
+        # This part was already correct based on previous diffs, but included for context.
+        matches = [name for name in await find_all_item_names_in_db(search_term) if name is not None]
+        choices = [
+            {"name": str(name), "value": str(name)} for name in matches[:25] # Limit to 25 choices
+        ]
         await ctx.send(choices=choices)
 
     @component_callback(re.compile(r"calc_(detail|simple)::([a-f0-9]{32})")) # Regex to capture the hash

@@ -54,7 +54,7 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 # All operations that use 'cursor' or 'conn' should be within this 'async with' block.
                 # 1. Try to fetch from the 'recipes' table (from nwdb.info)
                 await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
-                recipe_row = await cursor.fetchone()
+                recipe_row = await cursor.fetchone() # This line was correctly indented.
             # 1. Try to fetch from the 'recipes' table (from nwdb.info)
             logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
             if recipe_row:
@@ -79,12 +79,12 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 recipe_data.setdefault('output_item_name', resolved_item_name) # Use resolved name for output
                 return recipe_data
                 except (json.JSONDecodeError, KeyError) as e:
-                    logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}")
+                    logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}", exc_info=True)
                     return None # Return None if JSON parsing fails
 
             # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
             await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
-            legacy_recipe_row = await cursor.fetchone()
+            legacy_recipe_row = await cursor.fetchone() # This line was correctly indented.
             logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
             if legacy_recipe_row:
                 try:
@@ -103,7 +103,7 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 
                 return {"output_item_name": resolved_item_name, "ingredients": normalized_ingredients}
                 except (json.JSONDecodeError, KeyError) as e:
-                    logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}")
+                    logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}", exc_info=True)
                     return None # Return None if JSON parsing fails
         logging.info(f"No recipe found for '{resolved_item_name}' in any table.")
         return None
