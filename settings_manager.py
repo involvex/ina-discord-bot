@@ -11,7 +11,8 @@ def load_master_settings() -> Dict[str, Any]:
     except (FileNotFoundError, json.JSONDecodeError):
         default_settings = {
             "bot_managers": [],
-            "guild_settings": {}
+            "guild_settings": {},
+            "dev_mode_enabled": False # New default setting for auto-updates
         }
         save_master_settings(default_settings)
         return default_settings
@@ -73,6 +74,17 @@ def add_bot_manager(user_id: int) -> bool:
         save_bot_managers(managers)
         return True
     return False
+
+def get_dev_mode_setting() -> bool:
+    """Retrieves the current dev mode setting."""
+    settings = load_master_settings()
+    return settings.get("dev_mode_enabled", False)
+
+def set_dev_mode_setting(enabled: bool):
+    """Sets the dev mode setting."""
+    settings = load_master_settings()
+    settings["dev_mode_enabled"] = enabled
+    save_master_settings(settings)
 
 def remove_bot_manager(user_id: int) -> bool:
     managers = load_bot_managers()

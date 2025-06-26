@@ -17,6 +17,7 @@ except Exception as e:
 import asyncio
 import time
 import random # Added import for random
+import subprocess # Added for git commands
 import logging
 
 from interactions import Activity, ActivityType
@@ -24,6 +25,7 @@ from interactions import Activity, ActivityType
 from config import (
     __version__ as config_version,
     NW_FUNNY_STATUSES,
+    REPO_URL,
     BOT_START_TIME,
     SILLY_UPTIME_MESSAGES,
 )
@@ -34,6 +36,7 @@ from common_utils import format_uptime
 from dotenv import load_dotenv
 load_dotenv()
 
+from settings_manager import get_dev_mode_setting
 # Initialize logging
 from config import setup_logging # Ensure setup_logging is imported from config
 # We call setup_logging() here to ensure subsequent log messages are captured.
@@ -71,6 +74,96 @@ async def rotate_funny_presence(bot_instance, interval=300): # Interval of 5 min
             logging.warning(f"Failed to set presence: {e}")
 
         await asyncio.sleep(interval)
+
+async def auto_update_task(bot_instance, interval=3600): # Check every hour
+    """
+    Periodically checks for updates from the Git repository and attempts to apply them.
+    If dev mode is enabled, it will pull changes, install dependencies, and try to hot-reload.
+    """
+    await bot_instance.wait_until_ready()
+    repo_path = Path(__file__).parent.parent # Assuming bot is in interactions.py/
+    last_commit_hash_file = repo_path / ".last_commit_hash"
+
+    def get_current_commit_hash():
+        try:
+            result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=repo_path, check=True)
+            return result.stdout.strip()
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            logger.error(f"Failed to get current git commit hash: {e}")
+            return None
+
+    def save_current_commit_hash(commit_hash):
+        try:
+            with open(last_commit_hash_file, "w") as f:
+                f.write(commit_hash)
+        except IOError as e:
+            logger.error(f"Failed to save last commit hash: {e}")
+
+    # Initialize last_known_commit_hash
+    last_known_commit_hash = get_current_commit_hash()
+    if last_known_commit_hash:
+        save_current_commit_hash(last_known_commit_hash)
+    else:
+        logger.warning("Could not determine initial commit hash. Auto-update might not detect first changes correctly.")
+
+    while True:
+        await asyncio.sleep(interval)
+
+        if not get_dev_mode_setting():
+            logger.debug("Dev mode is disabled. Skipping auto-update check.")
+            continue
+
+        logger.info("Checking for bot updates...")
+        try:
+            # Fetch latest changes from remote
+            subprocess.run(["git", "fetch", "origin"], cwd=repo_path, check=True)
+            
+            # Get the new commit hash from origin/main (or origin/master)
+            result = subprocess.run(["git", "rev-parse", "origin/main"], capture_output=True, text=True, cwd=repo_path, check=True)
+            new_commit_hash = result.stdout.strip()
+
+            if new_commit_hash != last_known_commit_hash:
+                logger.info(f"New update found! Current: {last_known_commit_hash[:7]}, New: {new_commit_hash[:7]}")
+                
+                # Pull changes
+                subprocess.run(["git", "pull", "--ff-only"], cwd=repo_path, check=True)
+                logger.info("Git pull successful.")
+
+                # Install new dependencies
+                subprocess.run([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"], cwd=repo_path, check=True)
+                logger.info("Dependencies updated.")
+
+                # Attempt to hot-reload extensions
+                # This is a best-effort. Some changes (e.g., to main.py, config.py, or core libs) require a full restart.
+                logger.info("Attempting to hot-reload extensions...")
+                for ext in list(bot_instance.extensions.keys()): # Iterate over a copy
+                    try:
+                        bot_instance.unload_extension(ext)
+                        bot_instance.load_extension(ext)
+                        logger.info(f"Reloaded extension: {ext}")
+                    except Exception as e:
+                        logger.error(f"Failed to hot-reload extension {ext}: {e}", exc_info=True)
+                        logger.warning("A full bot restart might be required for all changes to take effect.")
+                
+                # Re-synchronize commands after reloading
+                await bot_instance.synchronise_interactions()
+                logger.info("Application commands re-synchronised after update.")
+
+                last_known_commit_hash = new_commit_hash
+                save_current_commit_hash(last_known_commit_hash)
+                logger.info("Bot updated successfully (hot-reload attempted).")
+            else:
+                logger.debug("No new updates found.")
+
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Git or pip command failed during auto-update: {e.stderr}", exc_info=True)
+        except FileNotFoundError:
+            logger.error("Git or pip command not found. Ensure Git is installed and in PATH, and Python is correctly set up.", exc_info=True)
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during auto-update: {e}", exc_info=True)
+
+        # Add a small random jitter to the interval to prevent multiple bots from hitting GitHub at the exact same time
+        await asyncio.sleep(interval + random.randint(0, 60))
 
 def discover_extensions(*root_dirs: str) -> list[str]:
     """
@@ -127,6 +220,7 @@ async def on_ready():
     # rotate_funny_presence is a general bot task and can remain here or be moved to a general extension.
     asyncio.create_task(rotate_funny_presence(bot, interval=300))
     
+    asyncio.create_task(auto_update_task(bot)) # Start the auto-update task
     logging.info(f"Ina is ready! Logged in as {bot.user.username} ({bot.user.id})")
     logging.info(f"Version: {config_version}")
     logging.info("--------------------------------------------------")

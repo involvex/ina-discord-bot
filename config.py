@@ -4,6 +4,7 @@ import sys
 import time
 
 # --- Bot Version ---
+REPO_URL = "https://github.com/involvex/ina-discord-bot.git" # Assuming this is your bot's repository URL
 VERSION_FILE_PATH = os.path.join(os.path.dirname(__file__), 'VERSION')
 try:
     with open(VERSION_FILE_PATH, 'r') as f:
