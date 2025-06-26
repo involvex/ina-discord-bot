@@ -1,95 +1,58 @@
 <p align="center">
-  <a href="https://github.com/involvex/ina-discord-bot">
-    <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot/main/docs/src/images/logo.png" alt="Ina's New World Bot Logo" width="150"/>
-  </a>
+  <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot/main/assets/ina_bot_logo.png" alt="Ina's Bot Logo" width="200"/>
 </p>
 
-<h1 align="center">Ina's New World Bot</h1>
+# Ina's Bot: Your Friendly (and Slightly Chaotic) New World Companion!
 
-<p align="center">
-  Your indispensable <strong>Aeternum</strong> companion for Discord.<br>
-  Uncover secrets, manage your arsenal, and conquer the island!
-</p>
+Welcome to Ina's Bot! I'm just a bot here to help you out in Aeternum. No fancy developer stuff, no complex contributions, just pure bot magic to make your New World experience a little easier (and maybe a little funnier).
 
-<p align="center">
-  <a href="https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8" target="_blank" rel="noopener">
-    <img src="https://img.shields.io/badge/%F0%9F%A4%96%20Invite%20Ina%20to%20Your%20Server-3A6EA5?style=for-the-badge&logo=discord&logoColor=white" alt="Invite Ina to Your Server">
-  </a>
-</p>
+Think of me as your personal, slightly-unhinged New World assistant. I'm here to answer your questions, calculate your crafting, and generally be helpful. Sometimes I get lost, but who doesn't in Aeternum?
 
----
+## What Can Ina Do? (Commands)
 
-## ✨ Key Features - Master the Island's Depths!
+Here's a quick rundown of what I can help you with. Just type these commands in Discord!
 
-* ⚔️ **Deep Dive Database:** Instantly access detailed information on New World items, perks, and recipes, leveraging data from `nwdb.info`. For example, use `/nwdb`, `/perk`, or `/recipe`.
-* 🔨 **Strategic Crafting:** Calculate materials for crafts, view full recipe breakdowns, and determine exact costs for your crafting endeavors. Try `/calculate_craft` or `/recipe`.
-* 🛡️ **Build Management:** Save, share, and manage your favorite New World builds directly from `nw-buddy.de`. Use `/build add` or `/build list`.
-* 👑 **Server Enhancements:** Enhance your server with optional welcome messages for new members and activity logging, making your guild hall truly grand.
-* 🌟 **Aeternum Fun:** Engage with fun commands, including the legendary `/petpet` ritual and more! Discover hidden delights.
-* 📜 **Bot Administration:** Tools for bot owners and administrators to manage the bot, including permissions and updates. Keep order in your domain.
-* 🔄 **Automatic Updates:** Configure Ina to check for and apply updates to herself (requires specific server-side setup), ensuring you always have the latest wisdom.
-* 📈 **Always Evolving:** Regularly updated with new features, improvements, and the latest New World game data. Aeternum's secrets are ever unfolding, and so is Ina!
+*   **`/nwdb <item_name>`**
+    *   Need to know about an item? Ina's got the deets! (Mostly.) I'll try to pull up information about any item you ask for.
+    *   *Example: `/nwdb Prismatic Ingot`*
 
----
+*   **`/recipe <item_name>`**
+    *   Wanna cook up something? Ina's got the recipe, even if it's for a legendary sandwich. I'll show you all the ingredients you need for a craftable item.
+    *   *Example: `/recipe Infused Health Potion`*
 
-## Commands - Your Toolkit for Aeternum!
+*   **`/calculate_craft <item_name> [amount] [fort_bonus] [armor_bonus] [tradeskill]`**
+    *   Too much math? Let Ina do the heavy lifting for your crafting needs. She's surprisingly good at numbers, for a bot. I'll tell you exactly how many raw materials you need, taking into account your crafting bonuses!
+    *   *Example: `/calculate_craft Asmodeum amount:10 fort_bonus:True armor_bonus:5 tradeskill:200`*
 
-Here's a list of available commands to aid your journey. Use `/help [command_name]` in Discord for more details on a specific command.
+*   **`/perk <perk_name>`**
+    *   Perks, perks, perks! Ina knows them all. Probably. Get details on specific perks.
+    *   *Example: `/perk Resilient`*
 
-### General Commands
-* `/ping`: Check if the bot is online – a quick whisper across the realms.
-* `/help [command_name]`: Show available commands or help for a specific command – consult the ancient texts.
-* `/petpet <user>`: Give a New World petting ritual to a user! Show your appreciation.
-* `/calculate <expression>`: Perform a calculation with New World magic! Unravel complex equations.
-* `/about`: Show information about Ina's New World Bot – learn about your companion.
+*   **`/build <action>`**
+    *   Manage your super-secret builds. Ina promises not to tell... much. (This command group lets you save, list, and remove your custom New World builds.)
+    *   *Example: `/build add "My Tank Build"`*
 
-### New World Specific Commands
-* `/nwdb <item_name>`: Look up items from New World Database – identify relics and resources.
-* `/perk <perk_name>`: Look up information about a specific New World perk – master your combat advantages.
-* `/recipe <item_name>`: Show the full recipe breakdown for a craftable item – unlock the secrets of creation.
-* `/calculate_craft <item_name> [amount]`: Calculate resources needed to craft an item, including intermediates – plan your grand designs.
+*   **`/manage devmode <action>`**
+    *   (For bot owner/managers only) Enable or disable Ina's auto-update shenanigans. She likes to keep herself fresh!
+    *   *Example: `/manage devmode enable`*
 
-### Build Management
-* `/build add <link> <name> [keyperks]`: Add a build from nw-buddy.de.
-* `/build list`: Show a list of saved builds.
-* `/build remove <name>`: Remove a saved build. (Requires: Manage Server or Bot Manager)
+## Issues & Help
 
-### Management & Settings (Require Permissions)
-* `/manage update`: Pulls updates from GitHub and restarts the bot. (Requires: Bot Owner)
-* `/manage restart`: Shuts down the bot for manual restart. (Requires: Bot Owner/Manager)
-* `/settings permit <user>`: Grants a user bot management permissions. (Requires: Server Admin or Bot Owner)
-* `/settings unpermit <user>`: Revokes a user's bot management permissions. (Requires: Server Admin or Bot Owner)
-* `/settings listmanagers`: Lists users with bot management permissions. (Requires: Server Admin or Bot Manager/Owner)
-* `/settings welcomemessages <action> [channel]`: Manage welcome messages. Actions: `enable`, `disable`, `status`. (Requires: Manage Server or Bot Manager/Owner)
-* `/settings logging <action> [channel]`: Manage server activity logging. Actions: `enable`, `disable`, `status`. (Requires: Manage Server or Bot Manager/Owner)
+Stuck? Bot acting weird? Ina sometimes has her moments. If I'm not behaving, or you think something's broken:
+
+*   **Check the command syntax:** Make sure you're typing the commands correctly.
+*   **Try again:** Sometimes Aeternum's internet is just bad.
+*   **Yell into the void:** If you're in a server where Ina lives, just ask for help! Someone might know what's up.
+
+Remember, I'm just a bot, and sometimes even bots need a nap.
 
 ---
 
-## Setup - Embark on Your Journey!
-
-1.  Clone the repository.
-2.  Install dependencies: `pip install -r requirements.txt`
-3.  Create a `.env` file in the root directory with your `BOT_TOKEN`. Example:
-    ```
-    BOT_TOKEN=YOUR_DISCORD_BOT_TOKEN_HERE
-    ```
-4.  Ensure `items.csv` and `perks.csv` are present in the root directory.
-5.  Run the bot: `python main.py`
-
-For automatic updates, ensure `update_bot.ps1` (Windows) or `update_bot.sh` (Linux) is executable and correctly configured for your environment. The bot also needs a process manager (like PM2 or systemd) to restart it after an update.
-
----
-
-## Important Links - Paths to Knowledge
-
-* 🔗 [View on GitHub](https://github.com/involvex/ina-discord-bot)
-* 📖 [Project Documentation](https://involvex.github.io/ina-discord-bot/)
-* 🎮 [Official New World Site](https://www.newworld.com/)
-* 🌐 [New World Database (nwdb.info)](https://nwdb.info/)
+*This bot is built using Python and the `interactions.py` library.*
+*All New World data is sourced from `nwdb.info`.*
 
 ---
 
 <p align="center">
-  <small>Created by Ina (Furnishing 250) and AI (Logging level 5)</small><br>
-  <small>Crafted with Azoth for the New World community &copy; 2025. Ina's Bot is a fan project and not affiliated with Amazon Games.</small>
+  <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot/main/assets/ina_bot_footer.png" alt="Ina's Bot Footer" width="100"/>
 </p>

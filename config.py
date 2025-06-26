@@ -69,7 +69,7 @@ NW_FUNNY_STATUSES = [
     {"name": "Resource Routes", "state": "Efficient. Or a bot."},
     {"name": "Combat Bots", "state": "Only light attacks. Always."},
     {"name": "GPS-guided Players", "state": "No deviation from the path."},
-    {"name": "Silent Teammates", "state": "Focused or bot?"}
+    {"name": "Silent Teammates", "state": "Focused or bot?"},
     # Add other statuses as needed
 ]
 BOT_INVITE_URL = "https://discord.com/oauth2/authorize?client_id=1368579444209352754&scope=bot+applications.commands&permissions=8"
