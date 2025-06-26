@@ -136,4 +136,4 @@ ITEMS_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_
 PERKS_FILE = 'perks.csv' # Default filename for local perks CSV
 PERKS_SCRAPED_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/perks_scraped.csv" # URL for scraped perks
 CRAFTING_RECIPES_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/craftingsrecipe.csv" # New primary URL for recipes
-LEGACY_CRAFTING_RECIPES_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/legacy_craftingsrecipe.csv" # Placeholder for a second, legacy recipes CSV
+LEGACY_CRAFTING_RECIPES_CSV_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/beta/craftingsrecipe.csv" # Placeholder for a second, legacy recipes CSV
