@@ -5,6 +5,78 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
+# Global constants (moved to top)
+PERK_PRETTY = {
+    'PerkID_Artifact_Set1_HeavyChest': ("Artifact Set: Heavy Chest", "🟣"),
+    'PerkID_Gem_EmptyGemSlot': ("Empty Gem Slot", "💠"),
+    }
+
+# Mapping for generic material names found in legacy crafting recipes to user-friendly names
+GENERIC_MATERIAL_MAPPING = {
+    "ingott1": "Iron Ingot",
+    "ingott2": "Steel Ingot",
+    "ingott3": "Starmetal Ingot",
+    "ingott4": "Orichalcum Ingot",
+    "ingott5": "Asmodeum", # This is a common guess for T5 ingot
+    "ingott51": "Orichalcum Ingot", # Specific to Prismatic Ingot recipe in legacy CSV
+    "ingott52": "Asmodeum", # Specific to Prismatic Ingot recipe in legacy CSV
+    "oret5": "Orichalcum Ore", # New: Raw T5 Ore
+    "reagentconvertert5": "Masterwork Material Converter", # New: T5 Reagent Converter
+    "fluxreagentst5": "Obsidian Flux", # New: T5 Flux Reagents (assuming same as Obsidian Flux)
+    "dungeondiamonds_flxpac_empyrean": "Empyrean Forge Materia", # New: Specific Dungeon Materia
+    # Note: The quantity for DungeonDiamonds_FLXPac_Empyrean in Prismatic Ingot recipe
+    "clotht51": "Phoenixweave", # New: T5.1 Cloth
+    "clotht52": "Spinweave Cloth", # New: T5.2 Cloth
+    "clothweavet5": "Wireweave", # New: T5 Cloth Weave
+    # should be 1, not 455000. This appears to be a data error in the source.
+    "leathert51": "Runic Leather", # New: T5.1 Leather
+    "leathert52": "Dark Leather", # New: T5.2 Leather
+    "tannint5": "Aged Tannin", # New: T5 Tannin
+    "timbert51": "Glittering Ebony", # New: T5.1 Wood Planks
+    "timbert52": "Runewood Planks", # New: T5.2 Wood Planks
+    "sandpapert5": "Obsidian Sandpaper", # New: T5 Sandpaper
+    "cinnabart1": "Cinnabar", # New: Raw Cinnabar
+    "fluxt1": "Weak Solvent",
+    "fluxt2": "Common Solvent",
+    "fluxt3": "Strong Solvent",
+    "fluxt4": "Pure Solvent",
+    "fluxt5": "Obsidian Flux",
+    "oret1": "Iron Ore",
+    "charcoalt1": "Charcoal",
+    "leather": "Leather", # Ensure common names are also mapped if they appear generically
+    "cloth": "Cloth",
+    "timber": "Timber",
+    "metal": "Metal", # Generic metal
+    "essencefiret1": "Fire Essence",
+    "essencelifet1": "Life Essence",
+    "essencewatert1": "Water Essence",
+    "essencedeatht1": "Death Essence",
+    "pearlt1": "Pearl",
+}
+
+# Corrected MATERIAL_EMOJIS definition
+MATERIAL_EMOJIS = {
+    "prismatic leather": "🟣", "iron ingot": "⛓️", "leather": "🟤", "wood": "🪵", # Line 74
+    "fiber": "🧵", "cloth": "🧶", "stone": "🪨", "gold ingot": "🥇", "silver ingot": "🥈", "iron ore": "🪨", "starmetal ore": "🌟", "orichalcum ore": "💎", # Line 75 - Added comma here
+    "steel ingot": "🔗", "starmetal ingot": "✨", "orichalcum ingot": "🔶", "asmodeum": "💎",
+    "weak solvent": "🧪", "common solvent": "🧪", "strong solvent": "🧪", "pure solvent": "🧪", "obsidian flux": "🧪",
+    "charcoal": "⚫", "fire essence": "🔥", "life essence": "💚", "water essence": "💧", "death essence": "💀",
+    "pearl": "⚪", "timber": "🪵", "metal": "⚙️", "orichalcum ore": "🪨", "masterwork material converter": "⚙️",
+    "cinnabar": "🔶", "empyrean forge materia": "💎", "runic leather": "🟪", "dark leather": "⚫", "aged tannin": "🍂",
+    "phoenixweave": "🌈", "spinweave cloth": "🕸️", "wireweave": "🧶", "glittering ebony": "🪵",
+    "runewood planks": "🪵", "obsidian sandpaper": " abrasive", # Add emojis for new generic names
+}
+
+# Add missing mappings for Prismatic materials
+GENERIC_MATERIAL_MAPPING.update({
+    "clotht53": "Prismatic Cloth",
+    "leathert53": "Prismatic Leather",
+    "timbert53": "Prismatic Planks",
+    "blockt53": "Prismatic Block",
+})
+
+GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"
+
 # Global cache for items_updated.json
 items_data_cache: Dict[str, Dict[str, Any]] = {}
 
@@ -112,75 +184,3 @@ def resolve_item_name_for_lookup(item_name: str) -> str:
 
     # 3. If not found in generic mapping or direct cache lookup, return original name
     return item_name
-
-
-PERK_PRETTY = {
-    'PerkID_Artifact_Set1_HeavyChest': ("Artifact Set: Heavy Chest", "🟣"),
-    'PerkID_Gem_EmptyGemSlot': ("Empty Gem Slot", "💠"),
-    }
-
-# Mapping for generic material names found in legacy crafting recipes to user-friendly names
-GENERIC_MATERIAL_MAPPING = {
-    "ingott1": "Iron Ingot",
-    "ingott2": "Steel Ingot",
-    "ingott3": "Starmetal Ingot",
-    "ingott4": "Orichalcum Ingot",
-    "ingott5": "Asmodeum", # This is a common guess for T5 ingot
-    "ingott51": "Orichalcum Ingot", # Specific to Prismatic Ingot recipe in legacy CSV
-    "ingott52": "Asmodeum", # Specific to Prismatic Ingot recipe in legacy CSV
-    "oret5": "Orichalcum Ore", # New: Raw T5 Ore
-    "reagentconvertert5": "Masterwork Material Converter", # New: T5 Reagent Converter
-    "fluxreagentst5": "Obsidian Flux", # New: T5 Flux Reagents (assuming same as Obsidian Flux)
-    "dungeondiamonds_flxpac_empyrean": "Empyrean Forge Materia", # New: Specific Dungeon Materia
-    # Note: The quantity for DungeonDiamonds_FLXPac_Empyrean in Prismatic Ingot recipe
-    "clotht51": "Phoenixweave", # New: T5.1 Cloth
-    "clotht52": "Spinweave Cloth", # New: T5.2 Cloth
-    "clothweavet5": "Wireweave", # New: T5 Cloth Weave
-    # should be 1, not 455000. This appears to be a data error in the source.
-    "leathert51": "Runic Leather", # New: T5.1 Leather
-    "leathert52": "Dark Leather", # New: T5.2 Leather
-    "tannint5": "Aged Tannin", # New: T5 Tannin
-    "timbert51": "Glittering Ebony", # New: T5.1 Wood Planks
-    "timbert52": "Runewood Planks", # New: T5.2 Wood Planks
-    "sandpapert5": "Obsidian Sandpaper", # New: T5 Sandpaper
-    "cinnabart1": "Cinnabar", # New: Raw Cinnabar
-    "fluxt1": "Weak Solvent",
-    "fluxt2": "Common Solvent",
-    "fluxt3": "Strong Solvent",
-    "fluxt4": "Pure Solvent",
-    "fluxt5": "Obsidian Flux",
-    "oret1": "Iron Ore",
-    "charcoalt1": "Charcoal",
-    "leather": "Leather", # Ensure common names are also mapped if they appear generically
-    "cloth": "Cloth",
-    "timber": "Timber",
-    "metal": "Metal", # Generic metal
-    "essencefiret1": "Fire Essence",
-    "essencelifet1": "Life Essence",
-    "essencewatert1": "Water Essence",
-    "essencedeatht1": "Death Essence",
-    "pearlt1": "Pearl",
-}
-
-# Corrected MATERIAL_EMOJIS definition
-MATERIAL_EMOJIS = {
-    "prismatic leather": "🟣", "iron ingot": "⛓️", "leather": "🟤", "wood": "🪵", # Line 74
-    "fiber": "🧵", "cloth": "🧶", "stone": "🪨", "gold ingot": "🥇", "silver ingot": "🥈", "iron ore": "🪨", "starmetal ore": "🌟", "orichalcum ore": "💎", # Line 75 - Added comma here
-    "steel ingot": "🔗", "starmetal ingot": "✨", "orichalcum ingot": "🔶", "asmodeum": "💎",
-    "weak solvent": "🧪", "common solvent": "🧪", "strong solvent": "🧪", "pure solvent": "🧪", "obsidian flux": "🧪",
-    "charcoal": "⚫", "fire essence": "🔥", "life essence": "💚", "water essence": "💧", "death essence": "💀",
-    "pearl": "⚪", "timber": "🪵", "metal": "⚙️", "orichalcum ore": "🪨", "masterwork material converter": "⚙️",
-    "cinnabar": "🔶", "empyrean forge materia": "💎", "runic leather": "🟪", "dark leather": "⚫", "aged tannin": "🍂",
-    "phoenixweave": "🌈", "spinweave cloth": "🕸️", "wireweave": "🧶", "glittering ebony": "🪵",
-    "runewood planks": "🪵", "obsidian sandpaper": " abrasive", # Add emojis for new generic names
-}
-
-# Add missing mappings for Prismatic materials
-GENERIC_MATERIAL_MAPPING.update({
-    "clotht53": "Prismatic Cloth",
-    "leathert53": "Prismatic Leather",
-    "timbert53": "Prismatic Planks",
-    "blockt53": "Prismatic Block",
-})
-
-GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"
