@@ -303,6 +303,45 @@ class NewWorldCrafting(Extension):
 
         await ctx.send(embeds=embed)
 
+    @slash_command(name="calculate_craft", description="Calculate all base materials needed for an item.")
+    @slash_option(
+        name="item_name",
+        description="The name of the item to calculate materials for.",
+        opt_type=OptionType.STRING,
+        required=True,
+        autocomplete=True
+    )
+    @slash_option(
+        name="amount",
+        description="The amount you want to craft.",
+        opt_type=OptionType.INTEGER,
+        required=False
+    )
+    async def calculate_craft(self, ctx: SlashContext, item_name: str, amount: int = 1):
+        await ctx.defer()
+
+        materials = await calculate_crafting_materials(item_name, amount, include_intermediate=True)
+
+        if not materials:
+            await ctx.send(f"Could not calculate materials for '{item_name}'. It might not be a craftable item or an error occurred.", ephemeral=True)
+            return
+
+        embed = Embed(
+            title=f"Base Materials for {amount}x {item_name}",
+            color=0x3498DB # Blue color
+        )
+
+        description_lines = []
+        for material, quantity in sorted(materials.items()):
+            description_lines.append(f"• **{quantity}x** {material}")
+
+        if description_lines:
+            embed.description = "\n".join(description_lines)
+        else:
+            embed.description = "No base materials required or found."
+
+        await ctx.send(embeds=embed)
+
     @recipe.autocomplete("item_name")
     async def recipe_autocomplete(self, ctx: AutocompleteContext):
         """
@@ -321,6 +360,11 @@ class NewWorldCrafting(Extension):
                 break
         
         await ctx.send(choices=choices)
+
+    # Reuse the same autocomplete logic for the new command
+    @calculate_craft.autocomplete("item_name")
+    async def calculate_craft_autocomplete(self, ctx: AutocompleteContext):
+        return await self.recipe_autocomplete(ctx)
 
 def setup(bot):
     NewWorldCrafting(bot)
