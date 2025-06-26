@@ -41,10 +41,10 @@ if [ ! -d ".git" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; the
 
     # Clone into a temporary directory
     TEMP_CLONE_DIR=$(mktemp -d)
-    git clone --branch "$GitBranch" "$GitRepoURL" "$TEMP_CLONE_DIR"
-    if [ "$INSTALL_GIT" = "true" ]; then
-      echo "ERROR: Git may not be properly installed. Check your package manager." >&2
-    fi
+    # The '|| { ...; exit 1; }' ensures the script exits if clone fails.
+    # 'set -e' at the top should also catch this, but explicit is better for critical steps.
+    git clone --branch "$GitBranch" "$GitRepoURL" "$TEMP_CLONE_DIR" || \
+        { echo "ERROR: Git clone failed for $GitRepoURL. Check network and repository URL. Aborting." >&2; exit 1; }
     echo "INFO: Moving cloned files into the current directory..."
     # Enable dotglob to move hidden files like .git and .gitignore
     shopt -s dotglob

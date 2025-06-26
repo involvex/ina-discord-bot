@@ -46,7 +46,7 @@ class AdminCommands(Extension):
             await ctx.send(f"User {user.mention} does not have bot management permissions.", ephemeral=True)
 
     @manage_group.subcommand(sub_cmd_name="devmode", sub_cmd_description="Enable or disable developer mode (auto-updates).")
-    @slash_option("action", "Enable or disable dev mode", opt_type=OptionType.STRING, required=True, choices=["enable", "disable"])
+    @slash_option("action", "Enable or disable dev mode", opt_type=OptionType.STRING, required=True, choices=[{"name": "Enable", "value": "enable"}, {"name": "Disable", "value": "disable"}])
     async def manage_devmode(self, ctx: SlashContext, action: str):
         if action == "enable":
             set_dev_mode_setting(True)
