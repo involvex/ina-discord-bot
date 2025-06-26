@@ -255,16 +255,26 @@ from config import DB_NAME
 def is_db_valid(db_path: str) -> bool:
     """
     Checks if a file is a valid, non-empty SQLite database.
+    Returns True if valid, False otherwise.
     """
     if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+        logging.debug(f"Database '{db_path}' does not exist or is empty.")
         return False
     try:
         conn = sqlite3.connect(db_path)
-        # A quick query to the master table is a fast and effective validity check.
-        conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        cursor = conn.cursor()
+        # Check for the existence of key tables
+        expected_tables = ["items", "perks", "recipes", "parsed_recipes"] # Add all critical tables
+        for table in expected_tables:
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+            if cursor.fetchone() is None:
+                logging.warning(f"Database '{db_path}' is missing expected table: '{table}'.")
+                conn.close()
+                return False
         conn.close()
         return True
     except sqlite3.DatabaseError:
+        logging.warning(f"Database '{db_path}' is corrupted or not a valid SQLite file: {e}")
         return False
 
 def load_all_game_data():
