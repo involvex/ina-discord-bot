@@ -90,12 +90,16 @@ class NewWorldCrafting(Extension):
     @slash_option("tradeskill", "Tradeskill (1-250, optional)", opt_type=OptionType.INTEGER, required=False)
     async def calculate_craft(self, ctx: SlashContext, item_name: str, amount: int = 1, fort_bonus: bool = True, armor_bonus: float = 10.0, tradeskill: int = 250):
         await ctx.defer()
-        materials = calculate_crafting_materials(item_name, amount, include_intermediate=False) # Start with simple view
+
+        # Resolve legacy item names (e.g., 'ingott5') to their proper names before calculation.
+        resolved_item_name = resolve_item_name_for_lookup(item_name)
+
+        materials = calculate_crafting_materials(resolved_item_name, amount, include_intermediate=False) # Start with simple view
         if not materials:
-            await ctx.send(f"Could not calculate materials for '{item_name}'.", ephemeral=True)
+            await ctx.send(f"Could not calculate materials for '{resolved_item_name}'. It might not be a craftable item.", ephemeral=True)
             return
 
-        await self._send_calculate_craft_embed(ctx, item_name, amount, fort_bonus, armor_bonus, tradeskill, materials, detailed=False, is_button_click=False)
+        await self._send_calculate_craft_embed(ctx, resolved_item_name, amount, fort_bonus, armor_bonus, tradeskill, materials, detailed=False, is_button_click=False)
 
     @calculate_craft.autocomplete("item_name")
     async def calculate_craft_autocomplete(self, ctx: AutocompleteContext):
