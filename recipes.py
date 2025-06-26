@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 import json
 import logging
 import sqlite3
+import aiosqlite
 from typing import Optional, Dict, Any, Set
 
 # This import assumes the project root is in sys.path, allowing top-level modules
@@ -18,13 +19,6 @@ from config import DB_NAME, TRACKED_RECIPES_FILE # Import DB_NAME and TRACKED_RE
 def slugify_recipe_name(name: str) -> str:
     # Basic slugify: lowercase, replace spaces and special chars
     return name.lower().replace(' ', '').replace("'", "").replace('-', '').replace('.', '').replace(',', '').replace('(', '').replace(')', '')
-
-
-def _get_db_connection() -> sqlite3.Connection:
-    """Establishes a connection to the SQLite database."""
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row # Access columns by name
-    return conn
 
 
 def track_recipe(user_id: str, item_name: str, recipe: dict):
@@ -49,24 +43,23 @@ def get_tracked_recipes(user_id: str):
         return []
 
 
-def get_recipe(item_name: str) -> Optional[Dict[str, Any]]: # Renamed from get_legacy_recipe
+async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
     """
     Fetches a recipe for the given item_name.
     It first tries the 'recipes' table (from nwdb.info, more comprehensive),
     then falls back to the 'parsed_recipes' table (from legacy CSV).
     Returns a dictionary with recipe details, or None if not found.
     """
-    # Resolve the item name before performing any lookups
     resolved_item_name = resolve_item_name_for_lookup(item_name)
-    item_name_lower = item_name.lower()
-    conn = None
     try:
-        conn = _get_db_connection()
-        cursor = conn.cursor()
+        async with aiosqlite.connect(DB_NAME) as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.cursor()
 
+            # 1. Try to fetch from the 'recipes' table (from nwdb.info)
+            await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
+            recipe_row = await cursor.fetchone()
         # 1. Try to fetch from the 'recipes' table (from nwdb.info)
-        cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
-        recipe_row = cursor.fetchone()
         logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
         if recipe_row:
             try:
@@ -94,8 +87,8 @@ def get_recipe(item_name: str) -> Optional[Dict[str, Any]]: # Renamed from get_l
                 return None # Return None if JSON parsing fails
 
         # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
-        cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
-        legacy_recipe_row = cursor.fetchone()
+        await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
+        legacy_recipe_row = await cursor.fetchone()
         logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
         if legacy_recipe_row:
             try:
@@ -118,19 +111,15 @@ def get_recipe(item_name: str) -> Optional[Dict[str, Any]]: # Renamed from get_l
                 return None # Return None if JSON parsing fails
         logging.info(f"No recipe found for '{resolved_item_name}' in any table.")
         return None
-    except sqlite3.Error as e:
+    except aiosqlite.Error as e:
         logging.error(f"Database error in get_recipe for '{resolved_item_name}': {e}")
         return None
-
     except Exception as e:
         logging.error(f"Unexpected error in get_recipe for '{item_name}': {e}", exc_info=True)
         return None
-    finally:
-        if conn:
-            conn.close() # Ensure connection is closed
 
 
-def _calculate_materials_recursive(
+async def _calculate_materials_recursive(
     item_name: str, 
     quantity_needed: int, 
     recipe_cache: Dict[str, Optional[Dict[str, Any]]], 
@@ -165,7 +154,7 @@ def _calculate_materials_recursive(
         recipe = recipe_cache[resolved_item_name]
     else:
         # Call get_recipe with the resolved name
-        recipe = get_recipe(resolved_item_name)
+        recipe = await get_recipe(resolved_item_name)
         recipe_cache[resolved_item_name] = recipe
 
     base_materials: Dict[str, int] = {}
@@ -182,7 +171,7 @@ def _calculate_materials_recursive(
             sub_item_quantity_per_craft = ingredient_info["quantity"]
             sub_item_total_needed = sub_item_quantity_per_craft * quantity_needed
 
-            sub_materials_for_ingredient = _calculate_materials_recursive(
+            sub_materials_for_ingredient = await _calculate_materials_recursive(
                 sub_item_name, sub_item_total_needed, recipe_cache, processed_for_cycle_detection, depth + 1, max_depth, unique_materials, max_unique_materials
             )
             for mat, qty in sub_materials_for_ingredient.items():
@@ -191,14 +180,14 @@ def _calculate_materials_recursive(
     processed_for_cycle_detection.remove(resolved_item_name)
     return base_materials
 
-def calculate_crafting_materials(item_name: str, quantity: int = 1, include_intermediate: bool = False) -> Optional[Dict[str, int]]:
+async def calculate_crafting_materials(item_name: str, quantity: int = 1, include_intermediate: bool = False) -> Optional[Dict[str, int]]:
     logging.info(f"Calculating crafting materials for '{item_name}', quantity={quantity}, include_intermediate={include_intermediate}")
     # Resolve the initial item name before any calculations
     resolved_initial_item_name = resolve_item_name_for_lookup(item_name)
     try:
         if not include_intermediate:
             # For non-intermediate calculation, we still need to resolve the item name
-            recipe = get_recipe(resolved_initial_item_name)
+            recipe = await get_recipe(resolved_initial_item_name)
             if not recipe:
                 logging.info(f"No direct recipe found for '{resolved_initial_item_name}' for non-intermediate calculation.")
                 return None # Or {item_name: quantity} if it should be treated as a base material
@@ -216,7 +205,7 @@ def calculate_crafting_materials(item_name: str, quantity: int = 1, include_inte
             # Limit recursion depth and unique materials to prevent OOM/crash
             logging.debug(f"Calling recursive material calculation for '{resolved_initial_item_name}'")
 
-            return _calculate_materials_recursive(
+            return await _calculate_materials_recursive(
                 resolved_initial_item_name, quantity, recipe_cache, processed_for_cycle_detection,
                 depth=0, max_depth=20, unique_materials=set(), max_unique_materials=100
             )

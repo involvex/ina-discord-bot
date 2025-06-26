@@ -30,7 +30,7 @@ class NewWorldCrafting(Extension):
     async def recipe(self, ctx: SlashContext, item_name: str):
         """Show the full recipe breakdown for a craftable item."""
         await ctx.defer()
-        recipe_dict = get_recipe(item_name)
+        recipe_dict = await get_recipe(item_name)
         if not recipe_dict:
             await ctx.send(f"No recipe found for '{item_name}'.", ephemeral=True)
             return
@@ -94,7 +94,7 @@ class NewWorldCrafting(Extension):
         # Resolve legacy item names (e.g., 'ingott5') to their proper names before calculation.
         resolved_item_name = resolve_item_name_for_lookup(item_name)
 
-        materials = calculate_crafting_materials(resolved_item_name, amount, include_intermediate=False) # Start with simple view
+        materials = await calculate_crafting_materials(resolved_item_name, amount, include_intermediate=False) # Start with simple view
         if not materials:
             await ctx.send(f"Could not calculate materials for '{resolved_item_name}'. It might not be a craftable item.", ephemeral=True)
             return
@@ -146,7 +146,7 @@ class NewWorldCrafting(Extension):
 
         detailed = view_type == "detail"
         
-        materials = calculate_crafting_materials(item_name, amount, include_intermediate=detailed)
+        materials = await calculate_crafting_materials(item_name, amount, include_intermediate=detailed)
         
         if not materials:
             logger.warning(f"Recalculation of materials failed for '{item_name}', detailed={detailed}.")
