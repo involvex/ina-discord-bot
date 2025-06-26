@@ -9,7 +9,7 @@ import csv
 import json # For serializing/deserializing ingredients
 import re # For cleaning up ingredient names
 import logging # Import logging module
-from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, CRAFTING_RECIPES_CSV_URL
+from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, CRAFTING_RECIPES_CSV_URL, LEGACY_CRAFTING_RECIPES_CSV_URL
 from scrape_items import scrape_nwdb_items, OUTPUT_CSV_FILE as SCRAPED_ITEMS_CSV
 
 ITEMS_CSV_PATH = "items.csv" #https://raw.githubusercontent.com/involvex/ina-discord-bot/refs/heads/beta/items.csv
