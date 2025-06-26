@@ -133,53 +133,56 @@ async def on_ready():
 
 # --- Main Execution ---
 import sqlite3
+import sys
 from config import DB_NAME
+
+def is_db_valid(db_path: str) -> bool:
+    """
+    Checks if a file is a valid, non-empty SQLite database.
+    """
+    if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+        return False
+    try:
+        conn = sqlite3.connect(db_path)
+        # A quick query to the master table is a fast and effective validity check.
+        conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        conn.close()
+        return True
+    except sqlite3.DatabaseError:
+        return False
 
 def load_all_game_data():
     """
-    Ensures the SQLite database file exists. If not, attempts to create and populate it.
-    The actual data loading into the DB is handled by create_db.py.
+    Ensures the SQLite database exists and is valid before the bot starts.
+    If the DB is missing or corrupted, it triggers a recreation.
     """
     logging.info("Verifying game data source (SQLite Database)...")
 
-    if not os.path.exists(DB_NAME):
-        logging.warning(
-            f"Database file '{DB_NAME}' not found. Attempting to create and populate it now. "
-            f"This may take some time and consume resources..."
-        )
+    # If the DB exists but is invalid, remove it to force recreation.
+    if os.path.exists(DB_NAME) and not is_db_valid(DB_NAME):
+        logging.warning(f"Database '{DB_NAME}' found but is invalid/corrupted. Removing to force recreation.")
         try:
-            from create_db import populate_db # Import here to avoid potential circular import issues at module load time
-            populate_db() # This function from create_db.py prints its own progress
-            if os.path.exists(DB_NAME):
-                conn = sqlite3.connect(DB_NAME)
-                conn.close()
-                logging.info(f"Database '{DB_NAME}' created and populated successfully.")
-            else:
-                # This case means populate_db ran but didn't create the file, which indicates an issue in populate_db
-                logging.error(
-                    f"CRITICAL: populate_db() completed but database file '{DB_NAME}' still not found. "
-                    f"Bot may not function correctly for data-dependent commands."
-                )
-        except ImportError:
-            logging.error(
-                "CRITICAL: Could not import 'populate_db' from 'create_db.py'. "
-                "Database cannot be automatically created. Please run 'create_db.py' manually if possible."
-            )
+            os.remove(DB_NAME)
         except Exception as e:
-            logging.error(
-                f"CRITICAL: An error occurred while trying to automatically create/populate the database '{DB_NAME}': {e}. "
-                f"Please run 'create_db.py' manually if possible. Bot may not function correctly.", exc_info=True
-            )
-    
+            logging.critical(f"Could not remove corrupted DB file: {e}. Please fix permissions and restart.", exc_info=True)
+            sys.exit(1)
+
+    # If the DB doesn't exist (either initially or after being removed), create it.
     if not os.path.exists(DB_NAME):
-        logging.critical(
-            f"CRITICAL: Database file '{DB_NAME}' not found and could not be created. "
-            f"The bot relies on this database for item, perk, and recipe data. "
-            f"Automatic creation failed or was not possible. The bot cannot start without it. Exiting."
-        )
+        logging.info(f"Database '{DB_NAME}' not found. Attempting to create and populate it now...")
+        try:
+            from create_db import populate_db
+            populate_db()
+        except Exception as e:
+            logging.critical(f"Failed to create and populate database: {e}", exc_info=True)
+            sys.exit(1)
+
+    # Final check to ensure we have a valid DB before proceeding.
+    if not is_db_valid(DB_NAME):
+        logging.critical(f"Database '{DB_NAME}' is still invalid after creation attempt. Exiting.")
         sys.exit(1)
-    else:
-        logging.info(f"Database '{DB_NAME}' is available. Bot will use it for data lookups.")
+
+    logging.info(f"Database '{DB_NAME}' is available and valid. Bot will use it for data lookups.")
 
     logging.info("Game data verification/creation process complete.")
 

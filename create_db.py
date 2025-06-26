@@ -151,190 +151,117 @@ def cleanup_items_csv():
 
 
 def populate_db():
-    conn = sqlite3.connect(DB_NAME) # Keep this as a print, as it's a final cleanup message
-    logging.info(f"Connecting to and populating database: {DB_NAME}")
-    cursor = conn.cursor()
-    try:
-        # --- Populate items table by running the live scraper ---
-        items_df = None
-        logging.info("Running item scraper to fetch latest data from nwdb.info...")
-        try:
-            scrape_nwdb_items()  # This will create 'items_scraped.csv'
-            logging.info("Item scraper finished successfully.")
-        except Exception as e:
-            logging.error(f"The item scraper failed: {e}. The database may be incomplete.", exc_info=True)
+    """
+    Atomically creates and populates the database. It builds a temporary database
+    and only replaces the main database file upon successful completion.
+    This prevents a corrupted/empty database from being used by the bot.
+    """
+    temp_db_name = f"{DB_NAME}.tmp"
+    conn = None
 
+    # Clean up old temp file if it exists from a previous failed run
+    if os.path.exists(temp_db_name):
+        os.remove(temp_db_name)
+
+    try:
+        conn = sqlite3.connect(temp_db_name)
+        logging.info(f"Connecting to and populating temporary database: {temp_db_name}")
+        cursor = conn.cursor()
+
+        # --- Populate items table ---
+        logging.info("Running item scraper...")
+        scrape_nwdb_items()
         if os.path.exists(SCRAPED_ITEMS_CSV):
-            logging.info(f"Loading item data from locally scraped file: {SCRAPED_ITEMS_CSV}")
             try:
                 items_df = pd.read_csv(SCRAPED_ITEMS_CSV, low_memory=False, encoding='utf-8')
-            except pd.errors.EmptyDataError:
-                logging.warning(f"Scraped items file '{SCRAPED_ITEMS_CSV}' is empty or invalid.")
-            except Exception as e:
-                logging.error(f"Error processing scraped items file '{SCRAPED_ITEMS_CSV}': {e}")
-        else:
-            logging.error(
-                f"Scraped items file '{SCRAPED_ITEMS_CSV}' not found after running scraper. "
-                "The 'items' table will be empty. Please check scraper logs for errors."
-            )
-
-        if items_df is not None:
-            try:
                 items_df.columns = [col.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent') for col in items_df.columns]
                 items_df.to_sql('items', conn, if_exists="replace", index=False)
                 logging.info("Successfully loaded data into 'items' table.")
-                logging.info("Creating index on 'items' table for faster lookups...")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_name_lower ON items (lower(Name))")
             except Exception as e:
-                logging.error(f"Error loading items data into database: {e}", exc_info=True)
+                logging.error(f"Error processing or loading items data: {e}", exc_info=True)
         else:
-            logging.warning("Could not load any item data for the 'items' table.")
+            logging.warning(f"Scraped items file '{SCRAPED_ITEMS_CSV}' not found. 'items' table will be empty.")
 
-        # --- Populate perks table from scraped data (primary source) ---
+        # --- Populate perks table ---
         df_perks_final = pd.DataFrame()  # This will be the final DataFrame for the 'perks' table
-
-        logging.info(f"Attempting to load perks data from scraped source: {PERKS_SCRAPED_CSV_URL}")
         scraped_perks_data = fetch_csv_data(PERKS_SCRAPED_CSV_URL)
         if scraped_perks_data:
             try:
                 df_scraped_perks = pd.read_csv(StringIO(scraped_perks_data), low_memory=False)
-                # Sanitize column names for DB
                 df_scraped_perks.columns = [col.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent') for col in df_scraped_perks.columns]
                 df_perks_final = df_scraped_perks.copy()
-                logging.info(f"Successfully loaded initial 'perks' data from {PERKS_SCRAPED_CSV_URL}.")
             except Exception as e:
                 logging.error(f"Error processing scraped perks data from {PERKS_SCRAPED_CSV_URL}: {e}", exc_info=True)
-        else:
-            logging.warning(f"Could not fetch scraped perks data from {PERKS_SCRAPED_CSV_URL}. 'perks' table might be incomplete.")
 
-        # --- Supplement/Override perks table from local perks_buddy.csv (secondary source) ---
         perks_buddy_csv_path = "perks_buddy.csv"
-        logging.info(f"Attempting to load and merge perks data from local file: {perks_buddy_csv_path}")
         if os.path.exists(perks_buddy_csv_path):
             try:
                 df_perks_buddy = pd.read_csv(perks_buddy_csv_path, low_memory=False)
-                
-                # Construct icon_url from perks_buddy.csv if 'Icon Path' exists
                 if 'Icon Path' in df_perks_buddy.columns:
                     df_perks_buddy['icon_url_from_buddy'] = "https://cdn.nw-buddy.de/nw-data/live/" + df_perks_buddy['Icon Path'].astype(str)
                 else:
                     df_perks_buddy['icon_url_from_buddy'] = ''
-
-                # Define columns to potentially override from perks_buddy.csv
-                # These are the columns in the DB schema that perks_buddy.csv might provide better data for
-                buddy_override_cols = {
-                    'id': 'Perk ID',
-                    'name': 'Name',
-                    'description': 'Description',
-                    'PerkType': 'Type',
-                    'ConditionText': 'Condition Event',
-                    'CompatibleEquipment': 'Item Class',
-                    'ExclusiveLabels': 'Exclusive Labels',
-                    'ExclusiveLabel': 'Exclusive Labels',
-                    'CraftModItem': 'Craft Mod',
-                    'GeneratedLabel': 'Category',
-                    'icon_url': 'icon_url_from_buddy'  # This is the key for the constructed URL
-                }
-
-                # Prepare df_perks_buddy for merging by selecting and renaming columns
+                buddy_override_cols = {'id': 'Perk ID', 'name': 'Name', 'description': 'Description', 'PerkType': 'Type', 'ConditionText': 'Condition Event', 'CompatibleEquipment': 'Item Class', 'ExclusiveLabels': 'Exclusive Labels', 'ExclusiveLabel': 'Exclusive Labels', 'CraftModItem': 'Craft Mod', 'GeneratedLabel': 'Category', 'icon_url': 'icon_url_from_buddy'}
                 df_buddy_processed = pd.DataFrame()
                 for db_col, buddy_col in buddy_override_cols.items():
                     if buddy_col in df_perks_buddy.columns:
                         df_buddy_processed[db_col] = df_perks_buddy[buddy_col]
-                    elif buddy_col == 'icon_url' and 'icon_url_from_buddy' in df_perks_buddy.columns:
-                        df_buddy_processed[db_col] = df_perks_buddy['icon_url_from_buddy']
-                    else:
-                        df_buddy_processed[db_col] = None  # Column not found in buddy, will be NaN
-
-                # Ensure 'id' column is present for merging
-                if 'id' not in df_buddy_processed.columns and 'Perk ID' in df_perks_buddy.columns:
-                    df_buddy_processed['id'] = df_perks_buddy['Perk ID']
-                if 'id' not in df_buddy_processed.columns and 'id' in df_perks_buddy.columns:  # Fallback if 'Perk ID' not there
-                    df_buddy_processed['id'] = df_perks_buddy['id']
-
-                # If df_perks_final is empty, and buddy data is available, use buddy data as base
                 if df_perks_final.empty and not df_buddy_processed.empty:
                     df_perks_final = df_buddy_processed.copy()
-                    logging.info(f"Using {perks_buddy_csv_path} as the primary source for perks (scraped data not available).")
                 elif not df_perks_final.empty and not df_buddy_processed.empty:
-                    # Merge buddy data into final DataFrame, prioritizing buddy data
                     df_perks_final = df_buddy_processed.set_index('id').combine_first(df_perks_final.set_index('id')).reset_index()
-                    logging.info(f"Successfully merged data from {perks_buddy_csv_path} into scraped perks data.")
-                else:
-                    logging.warning(f"{perks_buddy_csv_path} found, but no data to merge or primary data is missing.")
             except Exception as e:
                 logging.error(f"Error processing {perks_buddy_csv_path} for table 'perks': {e}", exc_info=True)
-        else:
-            logging.warning(f"{perks_buddy_csv_path} not found. 'perks' table will not be populated from this source.")
 
-        # Ensure all target DB columns exist in the final DataFrame, even if some sources were missing
         target_db_cols = ['id', 'name', 'description', 'PerkType', 'icon_url', 'ConditionText', 'CompatibleEquipment', 'ExclusiveLabels', 'ExclusiveLabel', 'CraftModItem', 'GeneratedLabel']
         for col in target_db_cols:
             if col not in df_perks_final.columns:
                 df_perks_final[col] = None
-
-        # Finally, write the combined DataFrame to SQL
         if not df_perks_final.empty:
             df_perks_final.to_sql("perks", conn, if_exists="replace", index=False)
-            logging.info("Creating index on 'perks' table for faster lookups...")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_perks_name_lower ON perks (lower(name))")
             logging.info(f"Successfully loaded combined data into 'perks' table.")
-        else:
-            logging.warning("No data available to populate 'perks' table.")
 
-        # --- Populate recipes table from nwdb.info/db/recipes ---
-        logging.info("Populating 'recipes' table from nwdb.info/db/recipes...")
+        # --- Populate recipes table ---
         recipes_data = fetch_recipes_data()
         if recipes_data:
             recipes_df = pd.DataFrame(recipes_data)
-            # Ensure 'recipes' table schema is correct before inserting
-            cursor.execute("""
-            CREATE TABLE IF NOT EXISTS recipes (
-                output_item_name TEXT PRIMARY KEY,
-                station TEXT,
-                skill TEXT,
-                skill_level INTEGER,
-                tier INTEGER,
-                ingredients TEXT,
-                raw_recipe_data TEXT
-            )
-            """)
             recipes_df.to_sql('recipes', conn, if_exists='replace', index=False)
             logging.info(f"Successfully added {len(recipes_df)} recipes to the 'recipes' table.")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_recipes_output_item_name_lower ON recipes (lower(output_item_name))")
 
-        # --- Populate parsed_recipes table from LEGACY_CRAFTING_RECIPES_CSV_URL ---
-        logging.info(f"Populating 'parsed_recipes' table from {LEGACY_CRAFTING_RECIPES_CSV_URL}...")
+        # --- Populate parsed_recipes table (legacy) ---
         legacy_csv_data = fetch_csv_data(LEGACY_CRAFTING_RECIPES_CSV_URL)
         if legacy_csv_data:
             parsed_legacy_recipes = parse_recipes(legacy_csv_data)
-            
-            # Prepare data for DataFrame
-            recipes_to_insert = []
-            for recipe_entry in parsed_legacy_recipes:
-                recipes_to_insert.append({
-                    'Name': recipe_entry['Name'],
-                    'Ingredients': json.dumps(recipe_entry['Ingredients']) # Store as JSON string
-                })
-
+            recipes_to_insert = [{'Name': r['Name'], 'Ingredients': json.dumps(r['Ingredients'])} for r in parsed_legacy_recipes]
             recipes_df = pd.DataFrame(recipes_to_insert)
-            
-            # Ensure 'parsed_recipes' table schema is correct before inserting
-            cursor.execute("""
-            CREATE TABLE IF NOT EXISTS parsed_recipes (
-                Name TEXT PRIMARY KEY,
-                Ingredients TEXT
-            )
-            """)
             recipes_df.to_sql('parsed_recipes', conn, if_exists='replace', index=False)
             logging.info(f"Successfully added {len(recipes_df)} recipes to the 'parsed_recipes' table.")
-            logging.info("Creating index on 'parsed_recipes' table for faster lookups...")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_parsed_recipes_name_lower ON parsed_recipes (lower(Name))")
-        else:
-            logging.warning("No legacy crafting recipe data fetched. 'parsed_recipes' table might be empty.")
+
+        logging.info("All tables created and indexed in temporary database.")
+
+    except Exception as e:
+        logging.error(f"A critical error occurred during database population: {e}", exc_info=True)
+        if conn:
+            conn.close()
+        if os.path.exists(temp_db_name):
+            os.remove(temp_db_name)
+            logging.info(f"Removed failed temporary database: {temp_db_name}")
+        raise  # Re-raise the exception so the caller in main.py knows it failed.
+    else:
+        # This block runs only if the try block completes without exceptions
+        if conn:
+            conn.close()
+        # Atomically replace the old DB with the new one
+        if os.path.exists(DB_NAME):
+            os.remove(DB_NAME)
+        os.rename(temp_db_name, DB_NAME)
+        logging.info(f"Successfully replaced '{DB_NAME}' with newly populated database.")
     finally:
-        conn.close()
-        logging.info("Database population finished.")
+        logging.info("Database population process finished.")
 
 if __name__ == "__main__":
     populate_db()
