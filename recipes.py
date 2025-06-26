@@ -16,10 +16,6 @@ from commands.new_world.utils import resolve_item_name_for_lookup
 from typing import Optional, Dict, Any, Set
 from config import DB_NAME, TRACKED_RECIPES_FILE # Import DB_NAME and TRACKED_RECIPES_FILE
 
-def slugify_recipe_name(name: str) -> str:
-    # Basic slugify: lowercase, replace spaces and special chars
-    return name.lower().replace(' ', '').replace("'", "").replace('-', '').replace('.', '').replace(',', '').replace('(', '').replace(')', '')
-
 
 def track_recipe(user_id: str, item_name: str, recipe: dict):
     try:
@@ -188,9 +184,9 @@ async def calculate_crafting_materials(item_name: str, quantity: int = 1, includ
         if not include_intermediate:
             # For non-intermediate calculation, we still need to resolve the item name
             recipe = await get_recipe(resolved_initial_item_name)
-            if not recipe:
-                logging.info(f"No direct recipe found for '{resolved_initial_item_name}' for non-intermediate calculation.")
-                return None # Or {item_name: quantity} if it should be treated as a base material
+            if not recipe or not recipe.get("ingredients"): # If no recipe or no ingredients, treat as base material
+                logging.info(f"No direct recipe found or no ingredients for '{resolved_initial_item_name}' for non-intermediate calculation. Treating as base material.")
+                return {resolved_initial_item_name: quantity}
             
             logging.debug(f"Recipe found for '{resolved_initial_item_name}': {recipe}")
             materials: Dict[str, int] = {}
