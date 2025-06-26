@@ -14,7 +14,7 @@ from scrape_items import scrape_nwdb_items, OUTPUT_CSV_FILE as SCRAPED_ITEMS_CSV
 
 ITEMS_CSV_PATH = "items.csv" #https://raw.githubusercontent.com/involvex/ina-discord-bot/refs/heads/beta/items.csv
 
-def fetch_csv_data(url, retries=3, delay=5, save_path=None):
+def fetch_csv_data(url, retries=3, retry_delay=5, post_fetch_delay=1, save_path=None):
     logging.info(f"Fetching CSV from {url}...")
     for i in range(retries):
         try:
@@ -24,20 +24,22 @@ def fetch_csv_data(url, retries=3, delay=5, save_path=None):
             if save_path:
                 with open(save_path, "w", encoding="utf-8") as f:
                     f.write(response.text)
+            if post_fetch_delay > 0:
+                time.sleep(post_fetch_delay) # Delay after successful fetch
             return response.text
         except requests.RequestException as e:
             logging.error(f"Error fetching CSV from {url}: {e}")
             if i < retries - 1:
-                logging.warning(f"Retrying in {delay} seconds... (Attempt {i + 2}/{retries})")
-                time.sleep(delay)
+                logging.warning(f"Retrying in {retry_delay} seconds... (Attempt {i + 2}/{retries})")
+                time.sleep(retry_delay)
             else:
                 logging.error(f"Failed to fetch CSV from {url} after {retries} attempts.")
                 return None
     return None # Should not be reached, but for clarity
 
-def fetch_and_parse_crafting_recipes(url: str, retries=3, delay=0.5):
+def fetch_and_parse_crafting_recipes(url: str, retries=3, retry_delay=0.5, post_fetch_delay=1):
     logging.info(f"Fetching crafting recipes from {url}...")
-    csv_data = fetch_csv_data(url, retries=retries, delay=delay)
+    csv_data = fetch_csv_data(url, retries=retries, retry_delay=retry_delay, post_fetch_delay=post_fetch_delay)
     if not csv_data:
         logging.error("Failed to fetch crafting recipe CSV data.")
         return []
@@ -78,7 +80,7 @@ def populate_parsed_recipes_table(conn):
     This function is designed to handle CSVs with 'Name', 'IngredientX', and 'QtyX' columns.
     """
     logging.info(f"Populating 'parsed_recipes' table from {LEGACY_CRAFTING_RECIPES_CSV_URL}...")
-    legacy_recipes_csv_data = fetch_csv_data(LEGACY_CRAFTING_RECIPES_CSV_URL)
+    legacy_recipes_csv_data = fetch_csv_data(LEGACY_CRAFTING_RECIPES_CSV_URL, post_fetch_delay=1)
     if not legacy_recipes_csv_data:
         logging.warning("Failed to fetch legacy crafting recipe CSV data. 'parsed_recipes' table will not be created or populated.")
         return
@@ -142,8 +144,8 @@ def populate_db():
         cursor = conn.cursor()
 
         # --- Populate items table from GitHub CSV ---
-        logging.info(f"Fetching comprehensive item data from {ITEMS_CSV_URL}...")
-        items_csv_data = fetch_csv_data(ITEMS_CSV_URL, save_path=ITEMS_CSV_PATH)
+        logging.info(f"Fetching comprehensive item data from {ITEMS_CSV_URL}...") # Added post_fetch_delay
+        items_csv_data = fetch_csv_data(ITEMS_CSV_URL, save_path=ITEMS_CSV_PATH, post_fetch_delay=1)
         if items_csv_data:
             try:
                 # Use the locally saved file from fetch_csv_data
@@ -158,8 +160,8 @@ def populate_db():
             logging.error(f"Failed to fetch item data from the URL. 'items' table will be empty.")
 
         # --- Populate perks table ---
-        df_perks_final = pd.DataFrame()  # This will be the final DataFrame for the 'perks' table
-        scraped_perks_data = fetch_csv_data(PERKS_SCRAPED_CSV_URL)
+        df_perks_final = pd.DataFrame()  # This will be the final DataFrame for the 'perks' table # Added post_fetch_delay
+        scraped_perks_data = fetch_csv_data(PERKS_SCRAPED_CSV_URL, post_fetch_delay=1)
         if scraped_perks_data:
             try:
                 df_scraped_perks = pd.read_csv(StringIO(scraped_perks_data), low_memory=False)
@@ -198,7 +200,7 @@ def populate_db():
             logging.info(f"Successfully loaded combined data into 'perks' table.")
 
         # --- Populate recipes table from GitHub CSV ---
-        recipes_data_for_db = fetch_and_parse_crafting_recipes(CRAFTING_RECIPES_CSV_URL)
+        recipes_data_for_db = fetch_and_parse_crafting_recipes(CRAFTING_RECIPES_CSV_URL, post_fetch_delay=1)
         if recipes_data_for_db:
             recipes_df = pd.DataFrame(recipes_data_for_db)
             recipes_df.to_sql('recipes', conn, if_exists='replace', index=False)
