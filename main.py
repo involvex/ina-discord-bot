@@ -264,7 +264,7 @@ def is_db_valid(db_path: str) -> bool:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         # Check for the existence of key tables
-        expected_tables = ["items", "perks", "recipes", "parsed_recipes"] # Add all critical tables
+        expected_tables = ["items", "perks", "recipes"] # Add all critical tables
         for table in expected_tables:
             cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
             if cursor.fetchone() is None:
