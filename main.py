@@ -147,9 +147,10 @@ async def auto_update_task(bot_instance):
                 logger.info("Dependencies updated.")
 
                 # Attempt to hot-reload extensions
-                # This is a best-effort. Some changes (e.g., to main.py, config.py, or core libs) require a full restart.
                 logger.info("Attempting to hot-reload extensions...")
-                for ext in list(bot_instance.extensions.keys()): # Iterate over a copy
+                # Use get_extensions() as .extensions attribute is deprecated/removed in newer interactions.py versions
+                # This is a best-effort. Some changes (e.g., to main.py, config.py, or core libs) require a full restart.
+                for ext in list(bot_instance.get_extensions().keys()): # Iterate over a copy of keys
                     try:
                         bot_instance.unload_extension(ext)
                         bot_instance.load_extension(ext)
