@@ -64,7 +64,8 @@ class AdminCommands(Extension):
         try:
             # The update script is expected to handle everything, including killing the current process.
             # We use Popen to detach the process so it can continue running even after the bot script exits.
-            subprocess.Popen(['./update_bot.sh'])
+            # By explicitly calling '/bin/bash', we avoid "Permission Denied" errors if the script loses its execute bit.
+            subprocess.Popen(['/bin/bash', './update_bot.sh'])
             await asyncio.sleep(2) # Give the script a moment to start
             logger.info(f"Update initiated by {ctx.author.user}. Shutting down to allow update script to take over.")
             await self.bot.stop()

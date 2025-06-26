@@ -30,7 +30,8 @@ echo ""
 
 # --- Step 1: Run the update script ---
 echo "INFO: Running the bot update script (./update_bot.sh)..."
-./update_bot.sh
+# We use /bin/bash to run the script to avoid permission issues if the execute bit is missing.
+/bin/bash ./update_bot.sh
 echo "INFO: Bot update script completed."
 echo ""
 
