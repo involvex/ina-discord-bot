@@ -18,6 +18,15 @@ GitRepoURL="https://github.com/involvex/ina-discord-bot.git"
 GitBranch="main"
 VENV_PATH="./venv"
 VenvActivateScript="$VENV_PATH/bin/activate"
+INSTALL_GIT="true" # Set to "false" to skip git installation
+
+# --- Check if git is installed and install if necessary ---
+if ! command -v git &> /dev/null; then
+    if [ "$INSTALL_GIT" = "true" ]; then
+        echo "INFO: git is not installed. Attempting to install it..."
+        apt-get update && apt-get install -y git # Assumes Debian/Ubuntu-based system
+    fi
+fi
 
 # Navigate to the script's directory (root of your bot)
 cd "$BotDirectory" || { echo "ERROR: Failed to navigate to bot directory $BotDirectory. Update aborted." >&2; exit 1; }
@@ -26,14 +35,16 @@ echo ""
 
 # --- Git Repository Management ---
 # Check if .git directory exists AND if it's a valid Git repository
-if [ ! -d ".git" ]; then
+if [ ! -d ".git" ] || ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "INFO: .git directory not found. This is not a Git repository."
     echo "INFO: Cloning repository from $GitRepoURL..."
 
     # Clone into a temporary directory
     TEMP_CLONE_DIR=$(mktemp -d)
     git clone --branch "$GitBranch" "$GitRepoURL" "$TEMP_CLONE_DIR"
-
+    if [ "$INSTALL_GIT" = "true" ]; then
+      echo "ERROR: Git may not be properly installed. Check your package manager." >&2
+    fi
     echo "INFO: Moving cloned files into the current directory..."
     # Enable dotglob to move hidden files like .git and .gitignore
     shopt -s dotglob
@@ -76,11 +87,15 @@ else
 
     echo "INFO: Starting forceful update from origin/$GitBranch..."
     echo "INFO: Fetching all remote branches and tags (shallow fetch)..."
-    git fetch --all --depth 1
-
+    git fetch --all --depth 1 || {
+            echo "ERROR: Git fetch failed. Check your Git configuration and network connectivity. Update aborted." >&2
+            exit 1
+        }
     echo "INFO: Resetting local branch to origin/$GitBranch..."
-    git reset --hard "origin/$GitBranch"
-
+    git reset --hard "origin/$GitBranch" || {
+        echo "ERROR: Git reset failed. There might be local changes preventing the reset. Update aborted." >&2
+        exit 1
+    }
     echo "INFO: Cleaning untracked and ignored files and directories..."
     git clean -fd # Changed from -fdx to -fd to preserve ignored files like .env
 
