@@ -120,7 +120,7 @@ python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
 # Install/update dependencies
 if [ -f "requirements.txt" ]; then
   echo "INFO: Installing/updating dependencies from requirements.txt..."
-  python3 -m pip install -U -r requirements.txt # Removed --no-cache-dir to allow pip to use its cache
+  python3 -m pip install -U -r requirements.txt
   echo "INFO: Dependencies installed/updated successfully."
 else
   echo "WARNING: requirements.txt not found. Skipping dependency installation." >&2
@@ -145,16 +145,27 @@ if [ ! -f "$DB_NAME" ]; then
     exit 1
 fi
 
-# --- Start the Bot ---
-echo "INFO: Starting the bot (main.py)..."
-if [ -f "main.py" ]; then
+# --- Start the Bot (using custom start script if available) ---
+CUSTOM_START_SCRIPT="start_bot.sh"
+
+echo "INFO: Checking for custom start script: $CUSTOM_START_SCRIPT..."
+if [ -f "$CUSTOM_START_SCRIPT" ]; then
+    echo "INFO: Custom start script '$CUSTOM_START_SCRIPT' found. Making it executable..."
+    chmod +x "$CUSTOM_START_SCRIPT"
+    echo "INFO: Running custom start script."
+    # Execute the custom start script. It should handle activating venv and running the bot.
+    # We use exec to replace the current shell process with the custom script's process.
+    exec "./$CUSTOM_START_SCRIPT"
+elif [ -f "main.py" ]; then
+    echo "INFO: No custom start script found. Starting the bot directly via main.py..."
     # Explicitly use the Python from the activated virtual environment
     if [ -n "$VIRTUAL_ENV" ]; then
-      echo "INFO: Running bot using Python from virtual environment: $VIRTUAL_ENV/bin/python3"
-      "$VIRTUAL_ENV/bin/python3" main.py
+        echo "INFO: Running bot using Python from virtual environment: $VIRTUAL_ENV/bin/python3"
+        # Use exec to replace the current shell process with the python process
+        exec "$VIRTUAL_ENV/bin/python3" main.py
     else
-      echo "ERROR: Virtual environment not detected or activated. Attempting to run bot with system python3 (may fail)." >&2
-      python3 main.py
+        echo "ERROR: Virtual environment not detected or activated. Attempting to run bot with system python3 (may fail)." >&2
+        exec python3 main.py # Use exec here too
     fi
 else
     echo "ERROR: main.py not found. Cannot start the bot." >&2
