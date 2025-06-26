@@ -24,6 +24,15 @@ else
     exit 1
 fi
 
+# --- Install/Update Dependencies ---
+# This ensures that any new dependencies are installed on startup.
+if [ -f "requirements.txt" ]; then
+  echo "INFO: Installing/updating dependencies from requirements.txt..."
+  "$VENV_PATH/bin/python3" -m pip install -U -r requirements.txt
+else
+  echo "WARNING: requirements.txt not found. Skipping dependency installation." >&2
+fi
+
 # Start the main bot application
 echo "INFO: Starting main.py..."
 # Use exec to replace the current shell process with the python process.
