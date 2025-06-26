@@ -10,6 +10,7 @@ import json # For serializing ingredients
 import re # For cleaning up ingredient names
 import logging # Import logging module
 from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, LEGACY_CRAFTING_RECIPES_CSV_URL  # Import new URL
+from scrape_items import scrape_nwdb_items, OUTPUT_CSV_FILE as SCRAPED_ITEMS_CSV
 
 def parse_recipes(csv_data):
     """
@@ -154,23 +155,28 @@ def populate_db():
     logging.info(f"Connecting to and populating database: {DB_NAME}")
     cursor = conn.cursor()
     try:
-        # --- Populate items table ---
-        # Force fetching items from remote URL by removing local scraped file if it exists
-        scraped_items_path = 'items_scraped.csv'
-        if os.path.exists(scraped_items_path):
-            logging.info(f"Removing existing local '{scraped_items_path}' to force fresh download from remote URL.")
-            os.remove(scraped_items_path)
-
+        # --- Populate items table by running the live scraper ---
         items_df = None
-        logging.info(f"Fetching items data from remote URL: {ITEMS_CSV_URL}")
-        csv_data = fetch_csv_data(ITEMS_CSV_URL)
-        if csv_data:
+        logging.info("Running item scraper to fetch latest data from nwdb.info...")
+        try:
+            scrape_nwdb_items()  # This will create 'items_scraped.csv'
+            logging.info("Item scraper finished successfully.")
+        except Exception as e:
+            logging.error(f"The item scraper failed: {e}. The database may be incomplete.", exc_info=True)
+
+        if os.path.exists(SCRAPED_ITEMS_CSV):
+            logging.info(f"Loading item data from locally scraped file: {SCRAPED_ITEMS_CSV}")
             try:
-                items_df = pd.read_csv(StringIO(csv_data), low_memory=False, encoding='utf-8')
+                items_df = pd.read_csv(SCRAPED_ITEMS_CSV, low_memory=False, encoding='utf-8')
             except pd.errors.EmptyDataError:
-                logging.warning(f"CSV from {ITEMS_CSV_URL} for table 'items' is empty or invalid.")
+                logging.warning(f"Scraped items file '{SCRAPED_ITEMS_CSV}' is empty or invalid.")
             except Exception as e:
-                logging.error(f"Error processing CSV for table 'items': {e}")
+                logging.error(f"Error processing scraped items file '{SCRAPED_ITEMS_CSV}': {e}")
+        else:
+            logging.error(
+                f"Scraped items file '{SCRAPED_ITEMS_CSV}' not found after running scraper. "
+                "The 'items' table will be empty. Please check scraper logs for errors."
+            )
 
         if items_df is not None:
             try:
