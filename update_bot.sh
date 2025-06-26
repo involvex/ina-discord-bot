@@ -90,26 +90,27 @@ echo ""
 
 # --- Virtual Environment & Dependencies ---
 echo "INFO: Setting up Python virtual environment..."
-if [ ! -d "$VENV_PATH" ]; then
-  echo "INFO: Virtual environment not found. Creating one at '$VENV_PATH'..."
+if [ ! -d "$VENV_PATH" ] || [ ! -f "$VenvActivateScript" ]; then
+  echo "INFO: Virtual environment not found or activate script missing/corrupted. Recreating at '$VENV_PATH'..."
+  # Remove existing venv directory to ensure a clean slate
+  if [ -d "$VENV_PATH" ]; then
+    rm -rf "$VENV_PATH"
+    echo "INFO: Removed existing (potentially corrupted) virtual environment."
+  fi
   python3 -m venv "$VENV_PATH"
 else
   echo "INFO: Virtual environment already exists at '$VENV_PATH'."
 fi
 
-# Activate virtual environment
-if [ -f "$VenvActivateScript" ]; then
-  echo "INFO: Activating virtual environment: $VenvActivateScript"
-  # shellcheck disable=SC1090
-  source "$VenvActivateScript"
-  if [ -z "$VIRTUAL_ENV" ]; then
-    echo "WARNING: Virtual environment activation failed. Ensure 'source' command is available." >&2
-  else
-    echo "INFO: Virtual environment activated."
-  fi
-else
-  echo "ERROR: Virtual environment activate script not found. Cannot proceed." >&2
+# Always attempt to activate after creation/check. If activation fails, the script will exit due to set -e.
+echo "INFO: Activating virtual environment: $VenvActivateScript"
+# shellcheck disable=SC1090
+source "$VenvActivateScript"
+if [ -z "$VIRTUAL_ENV" ]; then
+  echo "ERROR: Virtual environment activation failed. This is critical. Exiting." >&2
   exit 1
+else
+  echo "INFO: Virtual environment activated."
 fi
 
 # Upgrade pip and build tools
