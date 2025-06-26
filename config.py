@@ -32,7 +32,7 @@ GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Every 6 hours
 
 # --- Logging ---
-DEFAULT_LOG_LEVEL = logging.INFO
+DEFAULT_LOG_LEVEL = logging.DEBUG # Changed for debugging
 DEBUG_MODE_ENABLED = False # Tracks if debug mode is active
 
 # --- Presence Rotation ---
