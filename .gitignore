@@ -9,7 +9,8 @@ _build/
 build/
 dist/
 .env
-.venv
+.venv/
+venv/ # Explicitly ignore the venv directory
 .vscode
 __pycache__
 *.token
@@ -19,17 +20,11 @@ __pycache__
 /TestResults.xml
 /.coverage
 .mypy_cache/
-<<<<<<< HEAD
-# perks.csv is now tracked by git
-# perks_scraped.csv is now tracked by git
-# new_world_data.db is now tracked by git
-# perks_buddy.csv is now tracked by git
-=======
-perks.csv
-perks_scraped.csv
-new_world_world_data.db  <- Removed, as it's intended to be committed by update_perks.sh
-perks_buddy.csv    <- Removed, as it's intended to be committed by update_perks.sh
->>>>>>> 39774c447cfb42f3e89f0fcaa00a4437af1dac40
+# The following files are now tracked by Git and should NOT be ignored:
+# perks.csv
+# perks_scraped.csv
+# new_world_data.db
+# perks_buddy.csv
 items.json
 items_updated.json
 bfg.jar
