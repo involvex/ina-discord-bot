@@ -11,5 +11,6 @@
                 "channel_id": "1105739502972051486"
             }
         }
-    }
+    },
+    "dev_mode_enabled": true
 }

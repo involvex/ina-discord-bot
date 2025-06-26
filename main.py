@@ -28,6 +28,8 @@ from config import (
     REPO_URL,
     BOT_START_TIME,
     SILLY_UPTIME_MESSAGES,
+    DEV_MODE_UPDATE_INTERVAL,
+    NORMAL_MODE_UPDATE_INTERVAL,
 )
 from bot_client import bot
 from common_utils import format_uptime
@@ -76,7 +78,7 @@ async def rotate_funny_presence(bot_instance, interval=300): # Interval of 5 min
 
         await asyncio.sleep(interval)
 
-async def auto_update_task(bot_instance, interval=3600): # Check every hour
+async def auto_update_task(bot_instance):
     """
     Periodically checks for updates from the Git repository and attempts to apply them.
     If dev mode is enabled, it will pull changes, install dependencies, and try to hot-reload.
@@ -108,12 +110,22 @@ async def auto_update_task(bot_instance, interval=3600): # Check every hour
         logger.warning("Could not determine initial commit hash. Auto-update might not detect first changes correctly.")
 
     while True:
-        await asyncio.sleep(interval)
-
         if not get_dev_mode_setting():
-            logger.debug("Dev mode is disabled. Skipping auto-update check.")
-            continue
+            current_interval = NORMAL_MODE_UPDATE_INTERVAL
+            logger.debug(f"Dev mode is disabled. Next auto-update check in {current_interval} seconds.")
+        else:
+            current_interval = DEV_MODE_UPDATE_INTERVAL
+            logger.debug(f"Dev mode is enabled. Next auto-update check in {current_interval} seconds.")
 
+        # Add a small random jitter to the interval
+        sleep_duration = current_interval + random.randint(0, 60)
+        await asyncio.sleep(sleep_duration)
+
+        # Re-check dev mode after sleep, in case it was toggled during the sleep period
+        if not get_dev_mode_setting():
+            logger.debug("Dev mode was disabled during sleep. Skipping current auto-update check.")
+            continue
+        
         logger.info("Checking for bot updates...")
         try:
             # Fetch latest changes from remote
@@ -162,9 +174,6 @@ async def auto_update_task(bot_instance, interval=3600): # Check every hour
             logger.error("Git or pip command not found. Ensure Git is installed and in PATH, and Python is correctly set up.", exc_info=True)
         except Exception as e:
             logger.error(f"An unexpected error occurred during auto-update: {e}", exc_info=True)
-
-        # Add a small random jitter to the interval to prevent multiple bots from hitting GitHub at the exact same time
-        await asyncio.sleep(interval + random.randint(0, 60))
 
 def discover_extensions(*root_dirs: str) -> list[str]:
     """

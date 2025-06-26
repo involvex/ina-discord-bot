@@ -31,8 +31,12 @@ GITHUB_REPO_NAME = "ina-discord-bot" # Removed trailing hyphen
 GITHUB_VERSION_FILE_URL = f"https://raw.githubusercontent.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}/main/VERSION"
 UPDATE_CHECK_INTERVAL_SECONDS = 6 * 60 * 60  # Every 6 hours
 
+# --- Auto-update Intervals ---
+DEV_MODE_UPDATE_INTERVAL = 60  # 1 minute
+NORMAL_MODE_UPDATE_INTERVAL = 3600 # 1 hour
+
 # --- Logging ---
-DEFAULT_LOG_LEVEL = logging.DEBUG # Changed for debugging
+DEFAULT_LOG_LEVEL = logging.INFO # Changed for debugging
 DEBUG_MODE_ENABLED = False # Tracks if debug mode is active
 
 # --- Presence Rotation ---
