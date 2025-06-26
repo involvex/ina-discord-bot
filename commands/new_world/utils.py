@@ -57,6 +57,17 @@ def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all
     else:
         logger.info(f"nwdb_items_cache.json not found at: {nwdb_aliases_path}. Skipping alias loading.")
 
+    # 3. Add aliases from GENERIC_MATERIAL_MAPPING
+    # This ensures that if an internal name (e.g., "clotht53") exists in the cache,
+    # its corresponding display name (e.g., "Prismatic Cloth") also becomes a key
+    # pointing to the same item data.
+    generic_aliases_added_count = 0
+    for internal_name_lower, display_name in GENERIC_MATERIAL_MAPPING.items():
+        if internal_name_lower in items_data_cache and display_name.lower() not in items_data_cache:
+            items_data_cache[display_name.lower()] = items_data_cache[internal_name_lower]
+            generic_aliases_added_count += 1
+    logger.info(f"Added {generic_aliases_added_count} generic material aliases from GENERIC_MATERIAL_MAPPING to cache.")
+
     # Log total items in cache after loading both sources
     logger.info(f"Total {len(items_data_cache)} items (including aliases) in cache for crafting calculations.")
 
