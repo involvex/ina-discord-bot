@@ -151,6 +151,10 @@ async def auto_update_task(bot_instance):
                 # Use get_extensions() as .extensions attribute is deprecated/removed in newer interactions.py versions
                 # This is a best-effort. Some changes (e.g., to main.py, config.py, or core libs) require a full restart.
                 # for ext in list(bot_instance.get_extensions().keys()): # Iterate over a copy of keys
+                
+                # Temporarily disable automatic command syncing during hot-reload to prevent rate limits
+                original_sync_ext_state = bot_instance.sync_ext
+                bot_instance.sync_ext = False
                 # for ext in list(bot_instance.extensions.keys()):
                 for ext in discover_extensions("commands", "events"):
                     try:
@@ -158,12 +162,17 @@ async def auto_update_task(bot_instance):
                         bot_instance.load_extension(ext)
                         logger.info(f"Reloaded extension: {ext}")
                     except Exception as e:
+                        # Re-enable sync_ext before logging error to ensure it's reset even on failure
+                        bot_instance.sync_ext = original_sync_ext_state 
                         logger.error(f"Failed to hot-reload extension {ext}: {e}", exc_info=True)
                         logger.warning("A full bot restart might be required for all changes to take effect.")
                 
                 # Re-synchronize commands after reloading
                 await bot_instance.synchronise_interactions()
                 logger.info("Application commands re-synchronised after update.")
+
+                # Restore original sync_ext state
+                bot_instance.sync_ext = original_sync_ext_state
 
                 last_known_commit_hash = new_commit_hash
                 save_current_commit_hash(last_known_commit_hash)
