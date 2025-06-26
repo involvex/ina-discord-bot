@@ -109,6 +109,13 @@ if [ ! -d "$VENV_PATH" ] || [ ! -f "$VenvActivateScript" ]; then
     echo "INFO: Removed existing (potentially corrupted) virtual environment."
   fi
   python3 -m venv "$VENV_PATH"
+  # Verify that the venv was created successfully
+  if [ ! -f "$VenvActivateScript" ]; then
+    echo "ERROR: Virtual environment creation failed. Activate script not found at '$VenvActivateScript'. Aborting." >&2
+    exit 1
+  else
+    echo "INFO: Virtual environment created successfully."
+  fi
 else
   echo "INFO: Virtual environment already exists at '$VENV_PATH'."
 fi
