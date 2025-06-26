@@ -13,10 +13,16 @@ def _load_items_data_cache():
     global items_data_cache
     # Adjust path to point to items_updated.json in the project root
     items_path = os.path.join(os.path.dirname(__file__), "..", "..", "items_updated.json")
+    if not os.path.exists(items_path):
+        logger.error(f"items_updated.json not found at: {items_path}")
+        return
     try:
         with open(items_path, "r", encoding="utf-8") as f:
             raw_items = json.load(f)
-            items_data_cache = {item.get("Name", "").lower(): item for item in raw_items if isinstance(item, dict) and item.get("Name")}
+            if isinstance(raw_items, list):
+                items_data_cache = {item.get("Name", "").lower(): item for item in raw_items if isinstance(item, dict) and item.get("Name")}
+            else:
+                logger.error(f"items_updated.json content is not a list: {type(raw_items)}")
         logger.info(f"Loaded {len(items_data_cache)} items into cache for crafting calculations.")
     except Exception as e:
         logger.error(f"Failed to load items_updated.json for crafting cache: {e}", exc_info=True)
@@ -104,4 +110,6 @@ MATERIAL_EMOJIS = {
     "cinnabar": "🔶", "empyrean forge materia": "💎", "runic leather": "🟪", "dark leather": "⚫", "aged tannin": "🍂",
     "phoenixweave": "🌈", "spinweave cloth": "🕸️", "wireweave": "🧶", "glittering ebony": "🪵",
     "runewood planks": "🪵", "obsidian sandpaper": " abrasive", # Add emojis for new generic names
-}
+} # Corrected: "obsidian sandpaper": "Obsidian Sandpaper",
+
+GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"
