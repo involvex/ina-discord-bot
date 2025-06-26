@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import json
 import logging
 import sqlite3
-import aiosqlite
+import aiosqlite # Import aiosqlite
 from typing import Optional, Dict, Any, Set
 
 # This import assumes the project root is in sys.path, allowing top-level modules
@@ -38,7 +38,7 @@ def get_tracked_recipes(user_id: str):
     except Exception:
         return []
 
-async def get_all_recipe_names() -> list[str]:
+async def get_all_recipe_names() -> List[str]:
     """
     Fetches all unique recipe output names from both 'recipes' and 'parsed_recipes' tables.
     """
