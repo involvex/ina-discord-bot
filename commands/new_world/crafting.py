@@ -1,7 +1,7 @@
 import logging
 import json
-from interactions import Extension, slash_command, slash_option, OptionType, SlashContext, Embed, EmbedField
-from recipes import get_recipe # Assuming this is how it's imported
+from interactions import Extension, slash_command, slash_option, OptionType, SlashContext, Embed, EmbedField, AutocompleteContext
+from recipes import get_recipe, get_all_recipe_names # Assuming this is how it's imported
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,8 @@ class NewWorldCrafting(Extension):
         name="item_name",
         description="The name of the item to look up.",
         opt_type=OptionType.STRING,
-        required=True
+        required=True,
+        autocomplete=True # Enable autocomplete for this option
     )
     async def recipe(self, ctx: SlashContext, item_name: str):
         await ctx.defer() # Defer the response as lookup might take time
@@ -22,7 +23,7 @@ class NewWorldCrafting(Extension):
         recipe_data = await get_recipe(item_name)
 
         if not recipe_data:
-            await ctx.send(f"Sorry, I couldn't find a recipe for '{item_name}'.")
+            await ctx.send(f"Sorry, I couldn't find a recipe for '{item_name}'. Please check the spelling or try a different item. (e.g., 'Iron Ingot' instead of 'Iron')")
             return
 
         embed = Embed(
@@ -66,3 +67,22 @@ class NewWorldCrafting(Extension):
 
 def setup(bot):
     NewWorldCrafting(bot)
+
+    @recipe.autocomplete("item_name")
+    async def recipe_autocomplete(self, ctx: AutocompleteContext):
+        """
+        Provides autocomplete suggestions for the item_name option in the /recipe command.
+        """
+        search_term = ctx.input_text.lower()
+        
+        # Fetch all unique recipe names from the database
+        all_recipe_names = await get_all_recipe_names() 
+
+        choices = []
+        for name in all_recipe_names:
+            if search_term in name.lower():
+                choices.append({"name": name, "value": name})
+            if len(choices) >= 25: # Discord API limit for autocomplete choices
+                break
+        
+        await ctx.send(choices=choices)

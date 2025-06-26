@@ -38,6 +38,34 @@ def get_tracked_recipes(user_id: str):
     except Exception:
         return []
 
+async def get_all_recipe_names() -> List[str]:
+    """
+    Fetches all unique recipe output names from both 'recipes' and 'parsed_recipes' tables.
+    """
+    recipe_names = set()
+    try:
+        async with aiosqlite.connect(DB_NAME) as conn:
+            conn.row_factory = aiosqlite.Row
+            async with conn.cursor() as cursor:
+                # Get names from 'recipes' table
+                await cursor.execute("SELECT DISTINCT output_item_name FROM recipes")
+                for row in await cursor.fetchall():
+                    if row['output_item_name']:
+                        recipe_names.add(row['output_item_name'])
+                
+                # Get names from 'parsed_recipes' table
+                await cursor.execute("SELECT DISTINCT Name FROM parsed_recipes")
+                for row in await cursor.fetchall():
+                    if row['Name']:
+                        recipe_names.add(row['Name'])
+        
+    except aiosqlite.Error as e:
+        logging.error(f"Database error in get_all_recipe_names: {e}")
+    except Exception as e:
+        logging.error(f"Unexpected error in get_all_recipe_names: {e}", exc_info=True)
+    
+    return sorted(list(recipe_names))
+
 
 async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
     """
