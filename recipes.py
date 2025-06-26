@@ -105,6 +105,7 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                         return {"output_item_name": resolved_item_name, "ingredients": normalized_ingredients}
                     except (json.JSONDecodeError, KeyError) as e:
                         logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}", exc_info=True)
+                        logging.debug(f"Raw Ingredients data that failed to parse: {legacy_recipe_row.get('Ingredients')}")
                         return None  # Return None if JSON parsing fails
         logging.info(f"No recipe found for '{resolved_item_name}' in any table.")
         return None

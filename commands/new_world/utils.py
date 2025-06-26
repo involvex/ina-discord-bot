@@ -9,21 +9,58 @@ logger = logging.getLogger(__name__)
 items_data_cache: Dict[str, Dict[str, Any]] = {}
 
 # Load items_updated.json once when this module is imported
-def _load_items_data_cache():
+def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all_items_data
     global items_data_cache
     # Adjust path to point to items_updated.json in the project root
-    items_path = os.path.join(os.path.dirname(__file__), "..", "..", "items_updated.json")
-    if not os.path.exists(items_path):
-        logger.error(f"items_updated.json not found at: {items_path}")
-        return
+    items_updated_path = os.path.join(os.path.dirname(__file__), "..", "..", "items_updated.json")
+    nwdb_aliases_path = os.path.join(os.path.dirname(__file__), "..", "..", "nwdb_items_cache.json") # Path to aliases
+
+    # 1. Load main items data from items_updated.json
+    if not os.path.exists(items_updated_path):
+        logger.error(f"items_updated.json not found at: {items_updated_path}")
+        return # Exit if main data file is missing
     try:
-        with open(items_path, "r", encoding="utf-8") as f:
+        with open(items_updated_path, "r", encoding="utf-8") as f:
             raw_items = json.load(f)
             if isinstance(raw_items, list):
+                # Populate with canonical names first
                 items_data_cache = {item.get("Name", "").lower(): item for item in raw_items if isinstance(item, dict) and item.get("Name")}
             else:
                 logger.error(f"items_updated.json content is not a list: {type(raw_items)}")
-        logger.info(f"Loaded {len(items_data_cache)} items into cache for crafting calculations.")
+        logger.info(f"Loaded {len(items_data_cache)} items from items_updated.json into cache.")
+    except Exception as e:
+        logger.error(f"Failed to load items_updated.json for crafting cache: {e}", exc_info=True)
+        return # Exit if main data load fails
+
+    # 2. Load and apply aliases from nwdb_items_cache.json
+    if os.path.exists(nwdb_aliases_path):
+        try:
+            with open(nwdb_aliases_path, "r", encoding="utf-8") as f:
+                aliases = json.load(f)
+                if isinstance(aliases, dict):
+                    aliases_added_count = 0
+                    for alias_name, item_id_or_name in aliases.items():
+                        alias_name_lower = alias_name.lower()
+                        item_id_or_name_lower = item_id_or_name.lower()
+
+                        # Find the actual item data using the canonical name/ID from the already loaded items_updated.json
+                        actual_item_data = items_data_cache.get(item_id_or_name_lower)
+                        
+                        if actual_item_data and alias_name_lower not in items_data_cache: # Only add if it's a new alias, don't overwrite canonical names
+                            items_data_cache[alias_name_lower] = actual_item_data
+                            aliases_added_count += 1
+                    logger.info(f"Loaded {aliases_added_count} aliases from nwdb_items_cache.json into cache.")
+                else:
+                    logger.error(f"nwdb_items_cache.json content is not a dictionary: {type(aliases)}")
+        except Exception as e:
+            logger.error(f"Failed to load nwdb_items_cache.json for aliases: {e}", exc_info=True)
+    else:
+        logger.info(f"nwdb_items_cache.json not found at: {nwdb_aliases_path}. Skipping alias loading.")
+
+    # Log total items in cache after loading both sources
+    logger.info(f"Total {len(items_data_cache)} items (including aliases) in cache for crafting calculations.")
+
+_load_items_data_cache() # Call on import
     except Exception as e:
         logger.error(f"Failed to load items_updated.json for crafting cache: {e}", exc_info=True)
 

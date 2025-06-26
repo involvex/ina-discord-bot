@@ -103,7 +103,7 @@ class NewWorldItemCommands(Extension):
             return
         matches = await find_all_item_names_in_db(search_term)
         choices = []
-        for name in matches:
+        for name in matches[:25]: # Limit to 25 choices for Discord autocomplete
             if name is not None and str(name).strip(): # Explicitly check for None and empty strings
                 choices.append({"name": str(name), "value": str(name)})
 
