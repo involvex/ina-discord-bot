@@ -1,6 +1,8 @@
 import logging
 import os
 import asyncio
+import subprocess
+import sys
 
 from interactions import (
     Extension,
@@ -23,7 +25,6 @@ class AdminCommands(Extension):
     @slash_command(name="manage", description="Bot management commands (Owner/Manager only).")
     async def manage_group(self, ctx: SlashContext):
         """Base command for bot management."""
-        # Check for Administrator permission or bot manager role
         if not ctx.author.has_permission(Permissions.ADMINISTRATOR) and not is_bot_manager(int(ctx.author.id)):
             await ctx.send("You do not have permission to use this command.", ephemeral=True)
             return
@@ -54,8 +55,29 @@ class AdminCommands(Extension):
         elif action == "disable":
             set_dev_mode_setting(False)
             await ctx.send("Developer mode (auto-updates) has been **disabled**.", ephemeral=True)
-        else:
-            await ctx.send("Invalid action. Please choose 'enable' or 'disable'.", ephemeral=True)
+
+    @manage_group.subcommand(sub_cmd_name="update", sub_cmd_description="Pulls the latest updates from Git and restarts the bot.")
+    async def manage_update(self, ctx: SlashContext):
+        """Pulls the latest updates from Git and restarts the bot."""
+        await ctx.send("Attempting to pull the latest updates from Git... The bot will restart shortly.", ephemeral=True)
+        
+        try:
+            # The update script is expected to handle everything, including killing the current process.
+            # We use Popen to detach the process so it can continue running even after the bot script exits.
+            subprocess.Popen(['./update_bot.sh'])
+            await asyncio.sleep(2) # Give the script a moment to start
+            logger.info(f"Update initiated by {ctx.author.user}. Shutting down to allow update script to take over.")
+            await self.bot.stop()
+        except Exception as e:
+            logger.error(f"Failed to initiate update: {e}", exc_info=True)
+            await ctx.edit(content=f"An error occurred while trying to start the update process: {e}")
+
+    @manage_group.subcommand(sub_cmd_name="restart", sub_cmd_description="Restarts the bot.")
+    async def manage_restart(self, ctx: SlashContext):
+        """Restarts the bot process."""
+        await ctx.send("Restarting... Be right back!", ephemeral=True)
+        logger.info(f"Restart initiated by {ctx.author.user}. Shutting down.")
+        await self.bot.stop()
 
 def setup(bot: Client):
     AdminCommands(bot)
