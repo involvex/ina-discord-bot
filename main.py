@@ -273,7 +273,7 @@ def is_db_valid(db_path: str) -> bool:
                 return False
         conn.close()
         return True
-    except sqlite3.DatabaseError:
+    except sqlite3.DatabaseError as e:
         logging.warning(f"Database '{db_path}' is corrupted or not a valid SQLite file: {e}")
         return False
 
