@@ -18,12 +18,16 @@ async def find_item_in_db(item_name_query: str, exact_match: bool = False):
         async with aiosqlite.connect(DB_NAME) as conn:
             conn.row_factory = aiosqlite.Row
             async with conn.cursor() as cursor:
-                # Use lower() to make the search case-insensitive and utilize the lowercase index
                 if exact_match:
-                     await cursor.execute("SELECT * FROM items WHERE lower(Name) = ? LIMIT 25", (item_name_query.lower(),))
+                    query = "SELECT * FROM items WHERE lower(Name) = ? LIMIT 25"
+                    logging.info(f"Executing exact match query: {query} with item_name_query='{item_name_query}'")
+                    await cursor.execute(query, (item_name_query.lower(),))
                 else:
-                    await cursor.execute("SELECT * FROM items WHERE lower(Name) LIKE ? LIMIT 25", ('%' + item_name_query.lower() + '%',))
+                    query = "SELECT * FROM items WHERE lower(Name) LIKE ? LIMIT 25"
+                    logging.info(f"Executing LIKE query: {query} with item_name_query='{item_name_query}'")
+                    await cursor.execute(query, ('%' + item_name_query.lower() + '%',))
                 items = await cursor.fetchall()
+                logging.info(f"Query returned {len(items)} results.")
                 results = [dict(row) for row in items]
     except aiosqlite.Error as e:
         end_time = time.perf_counter()

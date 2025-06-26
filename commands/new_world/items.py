@@ -98,6 +98,7 @@ class NewWorldItemCommands(Extension):
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
         if not search_term:
             await ctx.send(choices=[])
+            logging.info("Autocomplete: Empty search term, returning no choices.")
             return
         matches = await find_item_in_db(search_term, exact_match=False)
 
@@ -107,6 +108,7 @@ class NewWorldItemCommands(Extension):
             if (name := get_any(row, ['Name', 'name'], None))
         ]
 
+        logging.info(f"Autocomplete: Search term '{search_term}' returned {len(choices)} choices.")
         await ctx.send(choices=choices)
 
 def setup(bot):
