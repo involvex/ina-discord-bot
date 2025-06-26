@@ -3,12 +3,12 @@ import json
 import re
 from typing import Optional
 
-from interactions import (
-    Extension, slash_command, slash_option, OptionType, SlashContext, AutocompleteContext, Embed, Permissions, Client
+from interactions import ( # Added Member to imports
+    Extension, slash_command, slash_option, OptionType, SlashContext, AutocompleteContext, Embed, Permissions, Client, Member
 )
 
 from settings_manager import is_bot_manager
-from config import BUILDS_FILE
+from config import BUILDS_FILE, OWNER_ID # Added OWNER_ID to imports
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +64,16 @@ class NewWorldBuilds(Extension):
     @build_group.subcommand(sub_cmd_name="remove", sub_cmd_description="Remove a saved build.")
     @slash_option("name", "The name of the build to remove", opt_type=OptionType.STRING, required=True, autocomplete=True)
     async def build_remove(self, ctx: SlashContext, name: str):
-        if not ctx.author.has_permission(Permissions.MANAGE_GUILD) and not is_bot_manager(int(ctx.author.id)):
-            await ctx.send("You do not have permission to use this command.", ephemeral=True)
+        is_allowed = False
+        if ctx.author.id == OWNER_ID: # Bot owner always has permission
+            is_allowed = True
+        elif is_bot_manager(int(ctx.author.id)): # Bot managers always have permission
+            is_allowed = True
+        elif isinstance(ctx.author, Member) and ctx.author.has_permission(Permissions.MANAGE_GUILD): # Guild managers have permission
+            is_allowed = True
+        
+        if not is_allowed:
+            await ctx.send("You do not have permission to remove builds.", ephemeral=True)
             return
 
         try:
