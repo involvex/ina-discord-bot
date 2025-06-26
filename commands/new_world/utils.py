@@ -61,10 +61,6 @@ def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all
     logger.info(f"Total {len(items_data_cache)} items (including aliases) in cache for crafting calculations.")
 
 _load_items_data_cache() # Call on import
-    except Exception as e:
-        logger.error(f"Failed to load items_updated.json for crafting cache: {e}", exc_info=True)
-
-_load_items_data_cache() # Call on import
 
 # Helper function to safely get values from item dictionary
 def get_any(item_dict: Dict[str, Any], keys: List[str], default: Any) -> Any:
@@ -174,6 +170,6 @@ GENERIC_MATERIAL_MAPPING.update({
     "leathert53": "Prismatic Leather",
     "timbert53": "Prismatic Planks",
     "blockt53": "Prismatic Block",
-}) # Corrected: "obsidian sandpaper": "Obsidian Sandpaper",
+})
 
 GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"
