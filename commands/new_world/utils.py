@@ -129,6 +129,14 @@ MATERIAL_EMOJIS = {
     "cinnabar": "🔶", "empyrean forge materia": "💎", "runic leather": "🟪", "dark leather": "⚫", "aged tannin": "🍂",
     "phoenixweave": "🌈", "spinweave cloth": "🕸️", "wireweave": "🧶", "glittering ebony": "🪵",
     "runewood planks": "🪵", "obsidian sandpaper": " abrasive", # Add emojis for new generic names
+}
+
+# Add missing mappings for Prismatic materials
+GENERIC_MATERIAL_MAPPING.update({
+    "clotht53": "Prismatic Cloth",
+    "leathert53": "Prismatic Leather",
+    "timbert53": "Prismatic Planks",
+    "blockt53": "Prismatic Block",
 } # Corrected: "obsidian sandpaper": "Obsidian Sandpaper",
 
 GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"

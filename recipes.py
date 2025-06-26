@@ -49,16 +49,16 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
     resolved_item_name = resolve_item_name_for_lookup(item_name)
     try:
         async with aiosqlite.connect(DB_NAME) as conn:
-            conn.row_factory = aiosqlite.Row
-            cursor = await conn.cursor()
+            conn.row_factory = aiosqlite.Row # Set row_factory on the connection
+            async with conn.cursor() as cursor: # Use async with for cursor as well
 
+                # 1. Try to fetch from the 'recipes' table (from nwdb.info)
+                await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
+                recipe_row = await cursor.fetchone()
             # 1. Try to fetch from the 'recipes' table (from nwdb.info)
-            await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
-            recipe_row = await cursor.fetchone()
-        # 1. Try to fetch from the 'recipes' table (from nwdb.info)
-        logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
-        if recipe_row:
-            try:
+            logging.debug(f"Querying 'recipes' table for '{resolved_item_name.lower()}'. Found: {bool(recipe_row)}")
+            if recipe_row:
+                try:
                 # The 'raw_recipe_data' column stores the full JSON object from nwdb.info
                 recipe_data = json.loads(recipe_row["raw_recipe_data"])
 
@@ -78,16 +78,16 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 # Ensure 'output_item_name' is present, using input item_name as fallback
                 recipe_data.setdefault('output_item_name', resolved_item_name) # Use resolved name for output
                 return recipe_data
-            except (json.JSONDecodeError, KeyError) as e:
-                logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}")
-                return None # Return None if JSON parsing fails
+                except (json.JSONDecodeError, KeyError) as e:
+                    logging.error(f"Failed to parse raw_recipe_data JSON for '{resolved_item_name}' from 'recipes' table: {e}")
+                    return None # Return None if JSON parsing fails
 
-        # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
-        await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
-        legacy_recipe_row = await cursor.fetchone()
-        logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
-        if legacy_recipe_row:
-            try:
+            # 2. If not found in 'recipes' table, try the 'parsed_recipes' table (from legacy CSV)
+            await cursor.execute("SELECT Name, Ingredients FROM parsed_recipes WHERE lower(Name) = ?", (resolved_item_name.lower(),))
+            legacy_recipe_row = await cursor.fetchone()
+            logging.debug(f"Querying 'parsed_recipes' table for '{resolved_item_name.lower()}'. Found: {bool(legacy_recipe_row)}")
+            if legacy_recipe_row:
+                try:
                 ingredients_list = json.loads(legacy_recipe_row["Ingredients"])
 
                 # --- NORMALIZATION ---
@@ -102,9 +102,9 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
                 # --- END NORMALIZATION ---
                 
                 return {"output_item_name": resolved_item_name, "ingredients": normalized_ingredients}
-            except (json.JSONDecodeError, KeyError) as e:
-                logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}")
-                return None # Return None if JSON parsing fails
+                except (json.JSONDecodeError, KeyError) as e:
+                    logging.error(f"Failed to parse Ingredients JSON for '{resolved_item_name}' from 'parsed_recipes' table: {e}")
+                    return None # Return None if JSON parsing fails
         logging.info(f"No recipe found for '{resolved_item_name}' in any table.")
         return None
     except aiosqlite.Error as e:
