@@ -36,6 +36,7 @@ from common_utils import format_uptime
 from dotenv import load_dotenv
 load_dotenv()
 
+logger = logging.getLogger(__name__) # Initialize logger at the top of the module
 from settings_manager import get_dev_mode_setting
 # Initialize logging
 from config import setup_logging # Ensure setup_logging is imported from config
