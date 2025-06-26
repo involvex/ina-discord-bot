@@ -84,7 +84,7 @@ async def auto_update_task(bot_instance):
     If dev mode is enabled, it will pull changes, install dependencies, and try to hot-reload.
     """
     await bot_instance.wait_until_ready()
-    repo_path = Path(__file__).parent.parent # Assuming bot is in interactions.py/
+    repo_path = Path(__file__).parent # The repo root is the directory containing main.py
     last_commit_hash_file = repo_path / ".last_commit_hash"
 
     def get_current_commit_hash():
