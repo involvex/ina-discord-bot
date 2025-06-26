@@ -95,11 +95,18 @@ def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all
         with open(items_updated_path, "r", encoding="utf-8") as f:
             raw_items = json.load(f)
             if isinstance(raw_items, list):
-                # Populate with canonical names first
-                items_data_cache = {item.get("Name", "").lower(): item for item in raw_items if isinstance(item, dict) and item.get("Name")}
+                for item in raw_items:
+                    if not isinstance(item, dict):
+                        continue
+                    # Add by Name (canonical display name)
+                    if item.get("Name"):
+                        items_data_cache[item["Name"].lower()] = item
+                    # Add by Item ID (internal ID) if different from Name and exists
+                    if item.get("Item ID") and item["Item ID"].lower() != item.get("Name", "").lower():
+                        items_data_cache[item["Item ID"].lower()] = item
             else:
                 logger.error(f"items_updated.json content is not a list: {type(raw_items)}")
-        logger.info(f"Loaded {len(items_data_cache)} items from items_updated.json into cache.")
+        logger.info(f"Loaded {len(items_data_cache)} items from items_updated.json into cache (initial pass with Name and Item ID).")
     except Exception as e:
         logger.error(f"Failed to load items_updated.json for crafting cache: {e}", exc_info=True)
         return # Exit if main data load fails
@@ -116,7 +123,7 @@ def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all
                         item_id_or_name_lower = item_id_or_name.lower()
 
                         # Find the actual item data using the canonical name/ID from the already loaded items_updated.json
-                        actual_item_data = items_data_cache.get(item_id_or_name_lower)
+                        actual_item_data = items_data_cache.get(canonical_id_or_name_lower) # Corrected variable name
                         
                         if actual_item_data and alias_name_lower not in items_data_cache: # Only add if it's a new alias, don't overwrite canonical names
                             items_data_cache[alias_name_lower] = actual_item_data
