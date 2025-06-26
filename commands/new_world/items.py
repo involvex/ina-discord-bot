@@ -14,7 +14,7 @@ from interactions import (
 from db_utils import find_item_in_db, find_perk_in_db
 from common_utils import scale_value_with_gs
 
-from commands.new_world.utils import get_any
+from commands.new_world.utils import get_any, items_data_cache # Import the in-memory cache
 logger = logging.getLogger(__name__)
 
 class NewWorldItemCommands(Extension):
@@ -26,15 +26,24 @@ class NewWorldItemCommands(Extension):
     async def nwdb(self, ctx: SlashContext, item_name: str):
         await ctx.defer()
 
-        item_results = await find_item_in_db(item_name, exact_match=True)
-        if not item_results:
-            item_results = await find_item_in_db(item_name, exact_match=False)
-            if not item_results:
-                await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
-                return
-        
-        item = item_results[0]
+        item = None
+        # 1. First, try the fast in-memory cache
+        item = items_data_cache.get(item_name.lower())
 
+        # 2. If not in cache, fall back to the database
+        if not item:
+            item_results = await find_item_in_db(item_name, exact_match=True)
+            if not item_results:
+                item_results = await find_item_in_db(item_name, exact_match=False)
+                if not item_results:
+                    await ctx.send(f"Item '{item_name}' not found in the database.", ephemeral=True)
+                    return
+            item = item_results[0]
+
+        if not item:
+            await ctx.send(f"Could not retrieve details for item '{item_name}'.", ephemeral=True)
+            return
+            
         name = get_any(item, ['Name', 'name'], item_name)
         item_id_for_url = get_any(item, ['Item ID', 'ItemID', 'Item_ID'], None)
         description = get_any(item, ['Description', 'description', 'Flavor Text', 'Flavor_Text'], 'No description available.')
