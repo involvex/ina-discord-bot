@@ -38,7 +38,7 @@ def get_tracked_recipes(user_id: str):
     except Exception:
         return []
 
-async def get_all_recipe_names() -> List[str]:
+async def get_all_recipe_names() -> list[str]:
     """
     Fetches all unique recipe output names from both 'recipes' and 'parsed_recipes' tables.
     """
