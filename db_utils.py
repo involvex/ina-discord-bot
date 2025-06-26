@@ -36,6 +36,39 @@ async def find_item_in_db(item_name_query: str, exact_match: bool = False):
         return [] 
     return results
 
+async def find_all_item_names_in_db(item_name_query: str):
+    """
+    Searches for item names across items, recipes, and parsed_recipes tables for autocomplete.
+    Returns a list of unique item names.
+    """
+    if not os.path.exists(DB_NAME):
+        logging.error(f"find_all_item_names_in_db: Database {DB_NAME} not found.")
+        return []
+
+    results = []
+    try:
+        async with aiosqlite.connect(DB_NAME) as conn:
+            async with conn.cursor() as cursor:
+                # Using UNION automatically handles duplicates
+                query = """
+                    SELECT Name FROM items WHERE lower(Name) LIKE ?
+                    UNION
+                    SELECT output_item_name as Name FROM recipes WHERE lower(output_item_name) LIKE ?
+                    UNION
+                    SELECT Name FROM parsed_recipes WHERE lower(Name) LIKE ?
+                    ORDER BY Name
+                    LIMIT 25
+                """
+                like_query = '%' + item_name_query.lower() + '%'
+                await cursor.execute(query, (like_query, like_query, like_query))
+                rows = await cursor.fetchall()
+                results = [row[0] for row in rows]
+                logging.info(f"Unified autocomplete query for '{item_name_query}' returned {len(results)} results.")
+    except aiosqlite.Error as e:
+        logging.error(f"SQLite error in find_all_item_names_in_db: {e}", exc_info=True)
+        return []
+    return results
+
 async def find_perk_in_db(perk_name_query: str, exact_match: bool = False, _attempted_update: bool = False):
     if not os.path.exists(DB_NAME): # Use imported DB_NAME
         logging.error(f"find_perk_in_db: Database {DB_NAME} not found.")

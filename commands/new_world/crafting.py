@@ -9,7 +9,7 @@ from interactions import (
     Extension, slash_command, slash_option, OptionType, SlashContext, AutocompleteContext, Embed, Client, Button, ButtonStyle, component_callback, ComponentContext
 ) # Added Button, ButtonStyle, component_callback, ComponentContext
 
-from db_utils import find_item_in_db
+from db_utils import find_item_in_db, find_all_item_names_in_db
 from recipes import get_recipe, calculate_crafting_materials, track_recipe
 from commands.new_world.utils import get_any, items_data_cache, GENERIC_MATERIAL_MAPPING, resolve_item_name_for_lookup
 
@@ -73,12 +73,11 @@ class NewWorldCrafting(Extension):
     async def recipe_autocomplete(self, ctx: AutocompleteContext):
         """Autocomplete for recipe item names."""
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-        if not search_term: return await ctx.send(choices=[])
-        matches = await find_item_in_db(search_term, exact_match=False)
+        if not search_term:
+            return await ctx.send(choices=[])
+        matches = await find_all_item_names_in_db(search_term)
         choices = [
-            {"name": str(name), "value": str(name)}
-            for row in matches[:25]
-            if (name := get_any(row, ['Name', 'name'], None))
+            {"name": str(name), "value": str(name)} for name in matches
         ]
         await ctx.send(choices=choices)
 
@@ -104,12 +103,11 @@ class NewWorldCrafting(Extension):
     @calculate_craft.autocomplete("item_name")
     async def calculate_craft_autocomplete(self, ctx: AutocompleteContext):
         search_term = ctx.input_text.lower().strip() if ctx.input_text else ""
-        if not search_term: return await ctx.send(choices=[])
-        matches = await find_item_in_db(search_term, exact_match=False)
+        if not search_term:
+            return await ctx.send(choices=[])
+        matches = await find_all_item_names_in_db(search_term)
         choices = [
-            {"name": str(name), "value": str(name)}
-            for row in matches[:25]
-            if (name := get_any(row, ['Name', 'name'], None))
+            {"name": str(name), "value": str(name)} for name in matches
         ]
         await ctx.send(choices=choices)
 
