@@ -123,7 +123,7 @@ def _load_items_data_cache(): # Renamed from _load_items_data_cache to _load_all
                         item_id_or_name_lower = item_id_or_name.lower()
 
                         # Find the actual item data using the canonical name/ID from the already loaded items_updated.json
-                        actual_item_data = items_data_cache.get(canonical_id_or_name_lower) # Corrected variable name
+                        actual_item_data = items_data_cache.get(item_id_or_name_lower)
                         
                         if actual_item_data and alias_name_lower not in items_data_cache: # Only add if it's a new alias, don't overwrite canonical names
                             items_data_cache[alias_name_lower] = actual_item_data
