@@ -218,7 +218,7 @@ async def on_ready():
     bot.sync_ext = False
 
     # Load all command and event extensions
-    extensions = discover_extensions("commands", "events")
+    extensions = discover_extensions("commands", "events") + ["recipes"] # Add recipes.py as an extension
 
     for extension in extensions:
         try:
