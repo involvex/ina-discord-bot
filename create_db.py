@@ -6,7 +6,7 @@ import requests
 import time # Import time for sleep
 from io import StringIO
 import csv
-import json # For serializing ingredients
+import json # For serializing/deserializing ingredients
 import re # For cleaning up ingredient names
 import logging # Import logging module
 from config import DB_NAME, ITEMS_CSV_URL, PERKS_SCRAPED_CSV_URL, CRAFTING_RECIPES_CSV_URL
@@ -71,6 +71,51 @@ def fetch_and_parse_crafting_recipes(url: str, retries=3, delay=0.5):
             'raw_recipe_data': json.dumps(row) # Store the whole row for full context
         })
     return recipes_for_db
+
+def populate_parsed_recipes_table(conn):
+    """
+    Populates the 'parsed_recipes' table from a legacy CSV URL.
+    This function is designed to handle CSVs with 'Name', 'IngredientX', and 'QtyX' columns.
+    """
+    logging.info(f"Populating 'parsed_recipes' table from {LEGACY_CRAFTING_RECIPES_CSV_URL}...")
+    legacy_recipes_csv_data = fetch_csv_data(LEGACY_CRAFTING_RECIPES_CSV_URL)
+    if not legacy_recipes_csv_data:
+        logging.warning("Failed to fetch legacy crafting recipe CSV data. 'parsed_recipes' table will not be created or populated.")
+        return
+
+    parsed_recipes_for_db = []
+    reader = csv.DictReader(StringIO(legacy_recipes_csv_data))
+    for row in reader:
+        output_item_name = row.get("Name")
+        if not output_item_name:
+            continue
+
+        ingredients = []
+        # Assuming the legacy CSV has IngredientX and QtyX columns, similar to CRAFTING_RECIPES_CSV_URL
+        for i in range(1, 8): # Assuming up to 7 ingredients
+            ing_name = row.get(f"Ingredient{i}")
+            ing_qty_str = row.get(f"Qty{i}")
+            if ing_name and ing_qty_str:
+                try:
+                    ing_qty = int(ing_qty_str)
+                    if ing_qty > 0:
+                        ingredients.append({"item": ing_name, "quantity": ing_qty}) # Use 'quantity' for consistency
+                except (ValueError, TypeError):
+                    continue
+
+        parsed_recipes_for_db.append({
+            'Name': output_item_name, # Use 'Name' as expected by recipes.py fallback
+            'Ingredients': json.dumps(ingredients) # Store ingredients as JSON string
+        })
+
+    if parsed_recipes_for_db:
+        parsed_recipes_df = pd.DataFrame(parsed_recipes_for_db)
+        parsed_recipes_df.to_sql('parsed_recipes', conn, if_exists="replace", index=False)
+        cursor = conn.cursor() # Get cursor to create index
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_parsed_recipes_name_lower ON parsed_recipes (lower(Name))")
+        logging.info(f"Successfully loaded {len(parsed_recipes_df)} recipes into 'parsed_recipes' table.")
+    else:
+        logging.warning("No recipes found in legacy CSV for 'parsed_recipes' table.")
 
 def cleanup_items_csv():
     if os.path.exists(ITEMS_CSV_PATH):
@@ -161,6 +206,9 @@ def populate_db():
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_recipes_output_item_name_lower ON recipes (lower(output_item_name))")
         else:
             logging.warning("No recipes loaded from GitHub CSV. 'recipes' table might be empty.")
+
+        # --- Populate parsed_recipes table from legacy CSV ---
+        populate_parsed_recipes_table(conn)
 
         logging.info("All tables created and indexed in temporary database.")
 
