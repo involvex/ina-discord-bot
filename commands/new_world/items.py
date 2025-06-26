@@ -101,10 +101,11 @@ class NewWorldItemCommands(Extension):
         if not search_term:
             await ctx.send(choices=[])
             return
-        # Ensure find_all_item_names_in_db returns a list of strings, and filter out any None values
-        matches = [name for name in await find_all_item_names_in_db(search_term) if name is not None]
+        # Ensure find_all_item_names_in_db returns a list of strings, and filter out any None values.
+        # Also ensure the name is not empty after stripping.
+        matches = [name for name in await find_all_item_names_in_db(search_term) if name is not None and str(name).strip()]
         choices = [
-            {"name": str(name), "value": str(name)} for name in matches[:25] # Limit to 25 choices
+            {"name": str(name), "value": str(name)} for name in matches[:25] # Limit to 25 choices.
         ]
 
         logging.info(f"Autocomplete: Search term '{search_term}' returned {len(choices)} choices.")

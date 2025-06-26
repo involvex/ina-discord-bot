@@ -50,8 +50,8 @@ async def get_recipe(item_name: str) -> Optional[Dict[str, Any]]:
     try:
         async with aiosqlite.connect(DB_NAME) as conn:
             conn.row_factory = aiosqlite.Row # Set row_factory on the connection
-            async with conn.cursor() as cursor: # Use async with for cursor as well. This block was previously mis-indented.
-                # All operations that use 'cursor' or 'conn' should be within this 'async with' block.
+            async with conn.cursor() as cursor: # Use async with for cursor as well.
+                # All operations that use 'cursor' should be within this 'async with cursor' block.
                 # 1. Try to fetch from the 'recipes' table (from nwdb.info)
                 await cursor.execute("SELECT raw_recipe_data FROM recipes WHERE lower(output_item_name) = ?", (resolved_item_name.lower(),))
                 recipe_row = await cursor.fetchone() # This line was correctly indented.

@@ -137,6 +137,6 @@ GENERIC_MATERIAL_MAPPING.update({
     "leathert53": "Prismatic Leather",
     "timbert53": "Prismatic Planks",
     "blockt53": "Prismatic Block",
-} # Corrected: "obsidian sandpaper": "Obsidian Sandpaper",
+}) # Corrected: "obsidian sandpaper": "Obsidian Sandpaper",
 
 GENERIC_MATERIAL_MAPPING["obsidian sandpaper"] = "Obsidian Sandpaper"
