@@ -88,13 +88,24 @@ else
 fi
 echo ""
 
+# --- Ensure previous bot process is terminated ---
+echo "INFO: Terminating any existing bot processes..."
+pkill -f "python3 main.py" || true # Kill any running python3 main.py processes, '|| true' prevents script from exiting if no process is found
+sleep 2 # Give some time for the process to terminate and release file locks
+echo "INFO: Existing bot processes terminated."
+
 # --- Virtual Environment & Dependencies ---
 echo "INFO: Setting up Python virtual environment..."
 if [ ! -d "$VENV_PATH" ] || [ ! -f "$VenvActivateScript" ]; then
   echo "INFO: Virtual environment not found or activate script missing/corrupted. Recreating at '$VENV_PATH'..."
   # Remove existing venv directory to ensure a clean slate
   if [ -d "$VENV_PATH" ]; then
-    rm -rf "$VENV_PATH"
+    echo "INFO: Removing existing (potentially corrupted) virtual environment..."
+    rm -rf "$VENV_PATH" || {
+      echo "ERROR: Failed to remove existing virtual environment. Check permissions or resource contention. Aborting." >&2
+      exit 1
+    }
+
     echo "INFO: Removed existing (potentially corrupted) virtual environment."
   fi
   python3 -m venv "$VENV_PATH"
@@ -113,10 +124,9 @@ else
   echo "INFO: Virtual environment activated."
 fi
 
-# Upgrade pip and build tools
-echo "INFO: Upgrading pip, setuptools, and wheel..."
-python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
-
+# The `python3 -m venv` command automatically installs pip, setuptools, and wheel.
+# We don't need to explicitly upgrade them here unless there's a specific reason,
+# and it can sometimes cause issues.
 # Install/update dependencies
 if [ -f "requirements.txt" ]; then
   echo "INFO: Installing/updating dependencies from requirements.txt..."
