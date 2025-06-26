@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot/main/assets/ina_bot_logo.png" alt="Ina's Bot Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/involvex/ina-discord-bot/main/docs/src/images/logo.png" alt="Ina's Bot Logo" width="200"/>
 </p>
 
 # Ina's Bot: Your Friendly (and Slightly Chaotic) New World Companion!
