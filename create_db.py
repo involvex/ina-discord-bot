@@ -168,20 +168,21 @@ def populate_db():
         logging.info(f"Connecting to and populating temporary database: {temp_db_name}")
         cursor = conn.cursor()
 
-        # --- Populate items table ---
-        logging.info("Running item scraper...")
-        scrape_nwdb_items()
-        if os.path.exists(SCRAPED_ITEMS_CSV):
+        # --- Populate items table from GitHub CSV ---
+        logging.info(f"Fetching comprehensive item data from {ITEMS_CSV_URL}...")
+        items_csv_data = fetch_csv_data(ITEMS_CSV_URL)
+        if items_csv_data:
             try:
-                items_df = pd.read_csv(SCRAPED_ITEMS_CSV, low_memory=False, encoding='utf-8')
+                # Use the locally saved file from fetch_csv_data
+                items_df = pd.read_csv(ITEMS_CSV_PATH, low_memory=False, encoding='utf-8')
                 items_df.columns = [col.replace(' ', '_').replace('(', '').replace(')', '').replace('%', 'percent') for col in items_df.columns]
                 items_df.to_sql('items', conn, if_exists="replace", index=False)
                 logging.info("Successfully loaded data into 'items' table.")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_name_lower ON items (lower(Name))")
             except Exception as e:
-                logging.error(f"Error processing or loading items data: {e}", exc_info=True)
+                logging.error(f"Error processing or loading items data from {ITEMS_CSV_PATH}: {e}", exc_info=True)
         else:
-            logging.warning(f"Scraped items file '{SCRAPED_ITEMS_CSV}' not found. 'items' table will be empty.")
+            logging.error(f"Failed to fetch item data from the URL. 'items' table will be empty.")
 
         # --- Populate perks table ---
         df_perks_final = pd.DataFrame()  # This will be the final DataFrame for the 'perks' table
