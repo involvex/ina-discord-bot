@@ -154,13 +154,6 @@ if [ -d "commands/new_world" ] && [ ! -f "commands/new_world/__init__.py" ]; the
     echo "ERROR: 'commands/new_world' directory is missing '__init__.py'. It cannot be imported." >&2
     exit 1
 fi
-DB_NAME="new_world_data.db"
-if [ ! -f "$DB_NAME" ]; then
-    echo "ERROR: Database file '$DB_NAME' not found after update." >&2
-    echo "ERROR: The bot will likely fail by running out of memory trying to build it." >&2
-    echo "ERROR: Please ensure '$DB_NAME' is committed to the Git repository." >&2
-    exit 1
-fi
 
 # --- Start the Bot (using custom start script if available) ---
 CUSTOM_START_SCRIPT="start_bot.sh"
