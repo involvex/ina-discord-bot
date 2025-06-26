@@ -48,8 +48,6 @@ class GeneralCommands(Extension):
             "settings permit": {"desc": "Grants a user bot management permissions.", "usage": "/settings permit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
             "settings unpermit": {"desc": "Revokes a user's bot management permissions.", "usage": "/settings unpermit <user>", "perms": "Server Admin or Bot Owner", "category": "Settings"},
             "settings listmanagers": {"desc": "Lists users with bot management permissions.", "usage": "/settings listmanagers", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
-            "manage debug": {"desc": "Enable or disable debug logging in the console.", "usage": "/manage debug <enable|disable>", "perms": "Bot Owner/Manager", "category": "Management"},
-            "manage cleanup": {"desc": "Cleans up cached files like __pycache__.", "usage": "/manage cleanup", "perms": "Bot Owner/Manager", "category": "Management"},
             "settings welcomemessages": {"desc": "Manage welcome messages. Actions: enable, disable, status.", "usage": "/settings welcomemessages <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"},
             "settings logging": {"desc": "Manage server activity logging. Actions: enable, disable, status.", "usage": "/settings logging <action> [channel]", "perms": "Server Admin or Bot Manager/Owner", "category": "Settings"}
         }
