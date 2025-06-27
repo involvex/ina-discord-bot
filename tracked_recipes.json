@@ -95,6 +95,54 @@
           }
         ]
       }
+    },
+    {
+      "item_name": "Ironheart",
+      "recipe": {
+        "output_item_name": "Ironheart",
+        "ingredients": [
+          {
+            "item": "AnyArtifactCraftingMat",
+            "quantity": 1
+          }
+        ]
+      }
+    },
+    {
+      "item_name": "Iron Ingot",
+      "recipe": {
+        "output_item_name": "Iron Ingot",
+        "ingredients": [
+          {
+            "item": "Iron Ore",
+            "quantity": 4
+          }
+        ]
+      }
+    },
+    {
+      "item_name": "Prismatic Ingot",
+      "recipe": {
+        "output_item_name": "Prismatic Ingot",
+        "ingredients": [
+          {
+            "item": "Orichalcum Ingot",
+            "quantity": 1
+          },
+          {
+            "item": "Asmodeum",
+            "quantity": 10
+          },
+          {
+            "item": "Obsidian Flux",
+            "quantity": 4
+          },
+          {
+            "item": "Charcoal",
+            "quantity": 4
+          }
+        ]
+      }
     }
   ]
 }

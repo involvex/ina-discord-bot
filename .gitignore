@@ -35,3 +35,5 @@ main notused.py
 main_old.py
 new_world_data2.db
 .env
+tracked_recipes.json
+new_world_data.db
